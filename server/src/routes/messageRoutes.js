@@ -5,6 +5,7 @@ import {
   deleteMessage,
   reactToMessage,
   markMessagesAsRead,
+  sendTypingStatus,
 } from '../controllers/messageController.js'
 import { protect } from '../middleware/authMiddleware.js'
 import { upload } from '../middleware/uploadMiddleware.js'
@@ -18,5 +19,6 @@ router.post('/', upload.single('file'), sendMessage)
 router.delete('/:id', deleteMessage)
 router.post('/:id/react', reactToMessage)
 router.put('/read/:conversationId', markMessagesAsRead)
+router.post('/typing', sendTypingStatus)
 
 export default router

@@ -2,6 +2,7 @@ import Message from '../models/Message.js'
 import Conversation from '../models/Conversation.js'
 import { uploadMediaToCloudinary } from '../services/cloudinaryService.js'
 import { FILE_LIMITS } from '../middleware/uploadMiddleware.js'
+import { triggerPusherEvent } from '../config/pusher.js'
 
 // @desc    Get messages for a conversation (paginated)
 // @route   GET /api/messages/:conversationId
@@ -136,6 +137,19 @@ export const sendMessage = async (req, res) => {
         populate: { path: 'senderId', select: 'displayName username' },
       })
 
+    // Trigger Realtime Pusher events
+    const channels = [`conversation-${conversationId}`]
+    if (conversation.participants && Array.isArray(conversation.participants)) {
+      conversation.participants.forEach((p) => {
+        channels.push(`user-${p.toString()}`)
+      })
+    }
+
+    triggerPusherEvent(channels, 'message:new', {
+      message: populated,
+      conversationId,
+    })
+
     res.status(201).json({ success: true, message: populated })
   } catch (error) {
     console.error('[Send Message Error]', error)
@@ -165,6 +179,12 @@ export const deleteMessage = async (req, res) => {
       message.attachmentUrl = ''
       message.attachmentMeta = {}
       await message.save()
+
+      triggerPusherEvent(`conversation-${message.conversationId}`, 'message:deleted', {
+        messageId: id,
+        conversationId: message.conversationId,
+        deleteFor: 'everyone',
+      })
     } else {
       if (!message.deletedFor.includes(userId)) {
         message.deletedFor.push(userId)
@@ -205,6 +225,13 @@ export const reactToMessage = async (req, res) => {
     }
 
     await message.save()
+
+    triggerPusherEvent(`conversation-${message.conversationId}`, 'message:reaction_update', {
+      messageId: id,
+      reactions: message.reactions,
+      conversationId: message.conversationId,
+    })
+
     res.status(200).json({ success: true, reactions: message.reactions })
   } catch (error) {
     res.status(500).json({ success: false, message: error.message })
@@ -227,7 +254,35 @@ export const markMessagesAsRead = async (req, res) => {
       { status: 'read' }
     )
 
+    triggerPusherEvent(`conversation-${conversationId}`, 'message:status_update', {
+      conversationId,
+      status: 'read',
+    })
+
     res.status(200).json({ success: true, message: 'Messages marked as read' })
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message })
+  }
+}
+
+// @desc    Broadcast typing status
+// @route   POST /api/messages/typing
+export const sendTypingStatus = async (req, res) => {
+  try {
+    const { conversationId, isTyping } = req.body
+    const userId = req.user._id
+
+    triggerPusherEvent(`conversation-${conversationId}`, isTyping ? 'typing:start' : 'typing:stop', {
+      conversationId,
+      userId,
+      user: {
+        _id: req.user._id,
+        displayName: req.user.displayName,
+        username: req.user.username,
+      },
+    })
+
+    res.status(200).json({ success: true })
   } catch (error) {
     res.status(500).json({ success: false, message: error.message })
   }

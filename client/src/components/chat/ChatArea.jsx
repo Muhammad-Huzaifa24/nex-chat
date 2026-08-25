@@ -106,14 +106,20 @@ export const ChatArea = ({ onBack, onImageClick }) => {
   }
 
   const handleTypingStart = () => {
-    if (socket && activeConversation) {
-      socket.emit('typing:start', { conversationId: activeConversation._id })
+    if (activeConversation) {
+      if (socket) {
+        socket.emit('typing:start', { conversationId: activeConversation._id })
+      }
+      api.post('/messages/typing', { conversationId: activeConversation._id, isTyping: true }).catch(() => {})
     }
   }
 
   const handleTypingStop = () => {
-    if (socket && activeConversation) {
-      socket.emit('typing:stop', { conversationId: activeConversation._id })
+    if (activeConversation) {
+      if (socket) {
+        socket.emit('typing:stop', { conversationId: activeConversation._id })
+      }
+      api.post('/messages/typing', { conversationId: activeConversation._id, isTyping: false }).catch(() => {})
     }
   }
 

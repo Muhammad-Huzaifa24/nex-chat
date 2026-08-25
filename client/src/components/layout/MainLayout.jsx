@@ -10,7 +10,8 @@ import { ImageLightbox } from '../media/ImageLightbox'
 import { useAuthStore } from '../../store/authStore'
 import { useConversationStore } from '../../store/conversationStore'
 import { useMessageStore } from '../../store/messageStore'
-import { getSocket, disconnectSocket } from '../../socket/socket'
+import { getSocket } from '../../socket/socket'
+import { subscribeChannel, unsubscribeChannel } from '../../socket/pusher'
 
 export const MainLayout = () => {
   const { user, token } = useAuthStore()
@@ -42,21 +43,20 @@ export const MainLayout = () => {
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
-  // Initialize data and Socket.IO
+  // Initialize data, Socket.IO & Pusher channels
   useEffect(() => {
     if (!token) return
 
     fetchConversations()
-    const socket = getSocket(token)
 
+    // 1. Socket.IO (Local dev / persistent server fallback)
+    const socket = getSocket(token)
     if (socket) {
-      // New incoming message
       socket.on('message:new', ({ message, conversationId }) => {
         addMessage(conversationId, message)
         updateLastMessage(conversationId, message)
       })
 
-      // Online status update
       socket.on('user:online', ({ userId }) => {
         setUserOnline(userId, true)
       })
@@ -65,7 +65,6 @@ export const MainLayout = () => {
         setUserOnline(userId, false)
       })
 
-      // Typing indicators
       socket.on('typing:start', ({ conversationId, user: typingUser }) => {
         setTyping(conversationId, typingUser, true)
       })
@@ -74,31 +73,79 @@ export const MainLayout = () => {
         setTyping(conversationId, userId, false)
       })
 
-      // Read receipts
       socket.on('message:status_update', ({ conversationId, status }) => {
         updateMessageStatus(conversationId, status)
       })
 
-      // Message reaction
       socket.on('message:reaction_update', ({ messageId, reactions, conversationId }) => {
         updateReaction(conversationId, messageId, reactions)
       })
 
-      // Message deleted
       socket.on('message:deleted', ({ messageId, conversationId, deleteFor }) => {
         deleteMessageLocal(conversationId, messageId, deleteFor)
       })
 
-      // Group updated
       socket.on('group:updated', ({ updatedConversation }) => {
         addOrUpdateConversation(updatedConversation)
       })
     }
 
-    return () => {
-      // Don't disconnect on layout re-render, keep session alive
+    // 2. Pusher User Channel (Serverless Realtime)
+    if (user?._id) {
+      const userChannelName = `user-${user._id}`
+      const userChannel = subscribeChannel(userChannelName)
+
+      if (userChannel) {
+        userChannel.bind('message:new', ({ message, conversationId }) => {
+          addMessage(conversationId, message)
+          updateLastMessage(conversationId, message)
+        })
+      }
+
+      return () => {
+        unsubscribeChannel(userChannelName)
+      }
     }
-  }, [token])
+  }, [token, user?._id])
+
+  // Pusher Conversation Channel Subscription
+  useEffect(() => {
+    if (!activeConversation?._id) return
+
+    const channelName = `conversation-${activeConversation._id}`
+    const channel = subscribeChannel(channelName)
+
+    if (channel) {
+      channel.bind('message:new', ({ message, conversationId }) => {
+        addMessage(conversationId, message)
+        updateLastMessage(conversationId, message)
+      })
+
+      channel.bind('message:status_update', ({ conversationId, status }) => {
+        updateMessageStatus(conversationId, status)
+      })
+
+      channel.bind('message:reaction_update', ({ messageId, reactions, conversationId }) => {
+        updateReaction(conversationId, messageId, reactions)
+      })
+
+      channel.bind('message:deleted', ({ messageId, conversationId, deleteFor }) => {
+        deleteMessageLocal(conversationId, messageId, deleteFor)
+      })
+
+      channel.bind('typing:start', ({ conversationId, user: typingUser }) => {
+        setTyping(conversationId, typingUser, true)
+      })
+
+      channel.bind('typing:stop', ({ conversationId, userId }) => {
+        setTyping(conversationId, userId, false)
+      })
+    }
+
+    return () => {
+      unsubscribeChannel(channelName)
+    }
+  }, [activeConversation?._id])
 
   return (
     <div
