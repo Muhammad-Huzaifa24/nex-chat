@@ -36,6 +36,7 @@ const corsOptions = {
     'Accept',
     'Origin',
     'Cookie',
+    "Access-Control-Allow-Origin"
   ],
   optionsSuccessStatus: 200,
 }
