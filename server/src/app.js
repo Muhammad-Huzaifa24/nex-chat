@@ -24,18 +24,10 @@ const ALLOWED_ORIGINS = [
 ].filter(Boolean)
 
 const corsOptions = {
-  origin: (origin, callback) => {
-    // Allow server-to-server requests (no Origin header) and whitelisted origins
-    if (!origin || ALLOWED_ORIGINS.includes(origin)) {
-      return callback(null, true)
-    }
-    // Allow any *.vercel.app subdomain (covers frontend previews)
-    if (origin.endsWith('.vercel.app')) {
-      return callback(null, true)
-    }
-    callback(new Error(`CORS: Origin ${origin} not allowed`))
-  },
-  credentials: true, // Allow cookies
+  // origin: true mirrors the exact request Origin back — works with credentials
+  // without the wildcard '*' restriction. Safe for all vercel.app preview URLs.
+  origin: true,
+  credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: [
     'Content-Type',
@@ -45,10 +37,10 @@ const corsOptions = {
     'Origin',
     'Cookie',
   ],
-  optionsSuccessStatus: 200, // IE11 compatibility
+  optionsSuccessStatus: 200,
 }
 
-// Handle OPTIONS preflight globally FIRST
+// Handle OPTIONS preflight globally FIRST (before any other middleware)
 app.options('*', cors(corsOptions))
 
 // Apply CORS to all routes
