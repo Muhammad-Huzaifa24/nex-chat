@@ -7,11 +7,11 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'https://nex-chat-taupe.vercel.app',
+        target: 'http://localhost:5000',
         changeOrigin: true,
       },
       '/socket.io': {
-        target: 'https://nex-chat-taupe.vercel.app',
+        target: 'http://localhost:5000',
         ws: true,
       },
     },

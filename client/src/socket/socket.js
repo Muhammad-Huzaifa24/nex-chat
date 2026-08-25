@@ -2,9 +2,11 @@ import { io } from 'socket.io-client'
 
 let socket = null
 
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || '/'
+
 export const getSocket = (token) => {
   if (!socket && token) {
-    socket = io('/', {
+    socket = io(SOCKET_URL, {
       auth: { token },
       autoConnect: true,
       reconnection: true,
