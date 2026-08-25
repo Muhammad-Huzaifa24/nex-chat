@@ -1,0 +1,115 @@
+/* Light Theme (Default) */
+:root, [data-theme="light"] {
+  --bg-app: #f0f2f5;
+  --bg-surface: #ffffff;
+  --bg-surface-hover: #f5f6f6;
+  --bg-surface-active: #ebebeb;
+  --bg-sidebar: #ffffff;
+  --bg-header: #f0f2f5;
+  --bg-chat: #efeae2;
+  --bg-chat-pattern: radial-gradient(#d1d7db 1px, transparent 1px);
+  --bg-input: #ffffff;
+  --bg-modal: #ffffff;
+  --bg-panel: #ffffff;
+
+  /* Text Colors */
+  --text-primary: #111b21;
+  --text-secondary: #667781;
+  --text-muted: #8696a0;
+  --text-inverse: #ffffff;
+
+  /* Message Bubbles */
+  --bubble-outgoing: #d9fdd3;
+  --bubble-outgoing-hover: #cff7c8;
+  --bubble-outgoing-text: #111b21;
+  --bubble-outgoing-meta: #667781;
+  
+  --bubble-incoming: #ffffff;
+  --bubble-incoming-hover: #f7f7f7;
+  --bubble-incoming-text: #111b21;
+  --bubble-incoming-meta: #667781;
+
+  /* Borders & Dividers */
+  --border-color: #e9edef;
+  --border-subtle: #f0f2f5;
+  --divider-color: #e9edef;
+
+  /* Action / Primary Elements */
+  --primary-color: #00a884;
+  --primary-color-hover: #06cf9c;
+  --primary-dark: #008069;
+  --badge-bg: #25d366;
+  --badge-text: #ffffff;
+
+  /* Status Colors */
+  --status-online: #25d366;
+  --status-offline: #8696a0;
+  --tick-sent: #8696a0;
+  --tick-delivered: #8696a0;
+  --tick-read: #53bdeb;
+
+  /* Scrollbar */
+  --scrollbar-thumb: rgba(0, 0, 0, 0.2);
+  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.35);
+
+  /* Modal Backdrop */
+  --backdrop-color: rgba(11, 20, 26, 0.55);
+}
+
+/* Dark Theme */
+[data-theme="dark"] {
+  --bg-app: #0c1317;
+  --bg-surface: #111b21;
+  --bg-surface-hover: #202c33;
+  --bg-surface-active: #2a3942;
+  --bg-sidebar: #111b21;
+  --bg-header: #202c33;
+  --bg-chat: #0b141a;
+  --bg-chat-pattern: radial-gradient(#182229 1px, transparent 1px);
+  --bg-input: #2a3942;
+  --bg-modal: #111b21;
+  --bg-panel: #111b21;
+
+  /* Text Colors */
+  --text-primary: #e9edef;
+  --text-secondary: #8696a0;
+  --text-muted: #667781;
+  --text-inverse: #111b21;
+
+  /* Message Bubbles */
+  --bubble-outgoing: #005c4b;
+  --bubble-outgoing-hover: #026955;
+  --bubble-outgoing-text: #e9edef;
+  --bubble-outgoing-meta: #8696a0;
+  
+  --bubble-incoming: #202c33;
+  --bubble-incoming-hover: #26353d;
+  --bubble-incoming-text: #e9edef;
+  --bubble-incoming-meta: #8696a0;
+
+  /* Borders & Dividers */
+  --border-color: #222e35;
+  --border-subtle: #182229;
+  --divider-color: #222e35;
+
+  /* Action / Primary Elements */
+  --primary-color: #00a884;
+  --primary-color-hover: #06cf9c;
+  --primary-dark: #008069;
+  --badge-bg: #00a884;
+  --badge-text: #111b21;
+
+  /* Status Colors */
+  --status-online: #00a884;
+  --status-offline: #667781;
+  --tick-sent: #8696a0;
+  --tick-delivered: #8696a0;
+  --tick-read: #53bdeb;
+
+  /* Scrollbar */
+  --scrollbar-thumb: rgba(255, 255, 255, 0.16);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.28);
+
+  /* Modal Backdrop */
+  --backdrop-color: rgba(0, 0, 0, 0.75);
+}
