@@ -14,7 +14,47 @@ dotenv.config()
 
 const app = express()
 
-// Middleware
+// ─── CORS ──────────────────────────────────────────────────────────────────
+// Must be defined before all other middleware, especially before express.json()
+// Cannot use wildcard '*' with credentials: true — must whitelist exact origins.
+const ALLOWED_ORIGINS = [
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  process.env.CLIENT_URL,
+].filter(Boolean)
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow server-to-server requests (no Origin header) and whitelisted origins
+    if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+      return callback(null, true)
+    }
+    // Allow any *.vercel.app subdomain (covers frontend previews)
+    if (origin.endsWith('.vercel.app')) {
+      return callback(null, true)
+    }
+    callback(new Error(`CORS: Origin ${origin} not allowed`))
+  },
+  credentials: true, // Allow cookies
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'X-Requested-With',
+    'Accept',
+    'Origin',
+    'Cookie',
+  ],
+  optionsSuccessStatus: 200, // IE11 compatibility
+}
+
+// Handle OPTIONS preflight globally FIRST
+app.options('*', cors(corsOptions))
+
+// Apply CORS to all routes
+app.use(cors(corsOptions))
+
+// ─── Core Middleware ────────────────────────────────────────────────────────
 app.use(helmet({ contentSecurityPolicy: false }))
 if (process.env.NODE_ENV !== 'production') {
   app.use(morgan('dev'))
@@ -23,48 +63,23 @@ app.use(express.json({ limit: '50mb' }))
 app.use(express.urlencoded({ extended: true, limit: '50mb' }))
 app.use(cookieParser())
 
-// CORS configuration supporting credentials from Vercel & localhost
-const allowedOrigins = [
-  'http://localhost:5173',
-  'http://127.0.0.1:5173',
-  process.env.CLIENT_URL,
-].filter(Boolean)
-
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps, curl, server-to-server)
-      if (!origin) return callback(null, true)
-      if (
-        allowedOrigins.includes(origin) ||
-        origin.endsWith('.vercel.app') ||
-        process.env.NODE_ENV !== 'production'
-      ) {
-        return callback(null, true)
-      }
-      return callback(null, true) // Permissive for easy initial setup
-    },
-    credentials: true,
-  })
-)
-
-// API Routes
+// ─── API Routes ─────────────────────────────────────────────────────────────
 app.use('/api/auth', authRoutes)
 app.use('/api/users', userRoutes)
 app.use('/api/conversations', conversationRoutes)
 app.use('/api/messages', messageRoutes)
 
-// Health Check
+// ─── Health Check ────────────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'ok', time: new Date().toISOString(), env: process.env.NODE_ENV || 'development' })
 })
 
-// Root route for Vercel
+// ─── Root ────────────────────────────────────────────────────────────────────
 app.get('/', (req, res) => {
   res.status(200).json({ name: 'NexChat API Server', status: 'online' })
 })
 
-// Global Error Handler
+// ─── Global Error Handler ─────────────────────────────────────────────────────
 app.use((err, req, res, next) => {
   if (err.code === 'LIMIT_FILE_SIZE') {
     return res.status(400).json({
