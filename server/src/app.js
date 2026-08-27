@@ -24,7 +24,13 @@ const ALLOWED_ORIGINS = [
 ].filter(Boolean)
 
 const corsOptions = {
-  origin: 'https://nex-chat-wjpg.vercel.app',
+  origin(origin, callback) {
+    // allow non-browser tools (curl, server-to-server) with no origin
+    if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+      return callback(null, true)
+    }
+    callback(new Error('Not allowed by CORS'))
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Requested-With'],
