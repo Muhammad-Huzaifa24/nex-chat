@@ -1,12 +1,11 @@
 import User from '../models/User.js'
 import { generateToken } from '../utils/jwt.js'
 
-const isProd = process.env.NODE_ENV === 'production'
 
 const cookieOptions = {
   httpOnly: true,
-  secure: isProd,                       // true in prod (https), false in local dev (http)
-  sameSite: isProd ? 'none' : 'lax',    // 'none' needed cross-site in prod, 'lax' fine locally
+  secure: true,        // hardcode true — you're always on https in this deployment
+  sameSite: 'none',    // hardcode none — frontend and backend are always cross-site here
   maxAge: 7 * 24 * 60 * 60 * 1000,
 }
 
@@ -118,11 +117,7 @@ export const logout = async (req, res) => {
         lastSeen: new Date(),
       })
     }
-    res.clearCookie('token', {
-      httpOnly: true,
-      secure: isProd,
-      sameSite: isProd ? 'none' : 'lax',
-    })
+    res.clearCookie('token', cookieOptions)
     res.status(200).json({ success: true, message: 'Logged out successfully' })
   } catch (error) {
     res.status(500).json({ success: false, message: error.message })
