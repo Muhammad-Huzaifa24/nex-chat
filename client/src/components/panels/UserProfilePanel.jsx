@@ -8,7 +8,9 @@ export const UserProfilePanel = ({ conversation, currentUserId, onClose }) => {
   if (!otherUser) return null
 
   return (
-    <div className="side-panel animate-slide-left">
+    <>
+      <div className="drawer-backdrop" onClick={onClose} />
+      <div className="side-panel">
       {/* Header */}
       <div
         style={{
@@ -249,6 +251,7 @@ export const UserProfilePanel = ({ conversation, currentUserId, onClose }) => {
           <span>Messages and calls are secured with end-to-end encryption.</span>
         </div>
       </div>
-    </div>
+      </div>
+    </>
   )
 }

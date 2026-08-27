@@ -55,7 +55,9 @@ export const EditProfilePanel = ({ onClose }) => {
   }
 
   return (
-    <div className="side-panel animate-slide-left">
+    <>
+      <div className="drawer-backdrop" onClick={onClose} />
+      <div className="side-panel" style={{ left: 'var(--sidebar-width)', right: 'auto' }}>
       {/* Header */}
       <div
         style={{
@@ -231,6 +233,7 @@ export const EditProfilePanel = ({ onClose }) => {
           {loading ? <Loader2 size={18} className="animate-spin" /> : 'Save Changes'}
         </button>
       </div>
-    </div>
+      </div>
+    </>
   )
 }

@@ -4,15 +4,17 @@ import dotenv from 'dotenv'
 import app from './app.js'
 import { connectDB } from './config/db.js'
 import { verifyCloudinary } from './config/cloudinary.js'
+import { verifyEmailConnection } from './services/emailService.js'
 import { initializeSocket } from './socket/socketManager.js'
 
 dotenv.config()
 
 const server = http.createServer(app)
 
-// Connect to MongoDB & Verify Cloudinary
-connectDB().then(() => {
-  verifyCloudinary()
+// Connect to MongoDB & Verify External Services (Cloudinary + Nodemailer)
+connectDB().then(async () => {
+  await verifyCloudinary()
+  await verifyEmailConnection()
 })
 
 // Initialize Socket.IO (for local dev server)

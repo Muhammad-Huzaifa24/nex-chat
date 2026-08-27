@@ -4,9 +4,11 @@ import { ArrowLeft, X, Users, UserPlus, LogOut, Shield, Trash2, Camera, Loader2 
 import api from '../../services/api'
 import { useConversationStore } from '../../store/conversationStore'
 import { useToastStore } from '../../store/toastStore'
+import { AddMemberModal } from '../modals/AddMemberModal'
 
 export const GroupInfoPanel = ({ conversation, currentUserId, onClose }) => {
   const [isEditing, setIsEditing] = useState(false)
+  const [showAddMemberModal, setShowAddMemberModal] = useState(false)
   const [groupName, setGroupName] = useState(conversation.groupName || '')
   const [groupDesc, setGroupDesc] = useState(conversation.groupDescription || '')
   const [loading, setLoading] = useState(false)
@@ -58,8 +60,10 @@ export const GroupInfoPanel = ({ conversation, currentUserId, onClose }) => {
   }
 
   return (
-    <div className="side-panel animate-slide-left">
-      {/* Header */}
+    <>
+      <div className="drawer-backdrop" onClick={onClose} />
+      <div className="side-panel">
+        {/* Header */}
       <div
         style={{
           display: 'flex',
@@ -119,8 +123,29 @@ export const GroupInfoPanel = ({ conversation, currentUserId, onClose }) => {
             border: '1px solid var(--border-color)',
           }}
         >
-          <div style={{ fontSize: 'var(--font-size-xs)', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Users size={14} /> {conversation.participants?.length || 0} PARTICIPANTS
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <div style={{ fontSize: 'var(--font-size-xs)', fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Users size={14} /> {conversation.participants?.length || 0} PARTICIPANTS
+            </div>
+            <button
+              onClick={() => setShowAddMemberModal(true)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                padding: '4px 10px',
+                borderRadius: 'var(--radius-full)',
+                backgroundColor: 'var(--bg-surface-hover)',
+                color: 'var(--primary-color)',
+                border: '1px solid var(--border-color)',
+                fontSize: 'var(--font-size-xs)',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'background-color var(--transition-fast)',
+              }}
+            >
+              <UserPlus size={13} /> Add Member
+            </button>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 220, overflowY: 'auto' }}>
@@ -211,6 +236,14 @@ export const GroupInfoPanel = ({ conversation, currentUserId, onClose }) => {
           <LogOut size={16} /> Leave Group
         </button>
       </div>
-    </div>
+      </div>
+
+      {/* Add Member Modal */}
+      <AddMemberModal
+        isOpen={showAddMemberModal}
+        onClose={() => setShowAddMemberModal(false)}
+        conversation={conversation}
+      />
+    </>
   )
 }

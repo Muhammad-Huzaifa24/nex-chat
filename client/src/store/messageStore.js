@@ -37,7 +37,7 @@ export const useMessageStore = create((set, get) => ({
   addMessage: (conversationId, message) => {
     set((state) => {
       const current = state.messages[conversationId] || []
-      // Check if already in list
+      // Check if already in list (by _id or tempId)
       if (current.some((m) => m._id === message._id)) {
         return state
       }
@@ -45,6 +45,48 @@ export const useMessageStore = create((set, get) => ({
         messages: {
           ...state.messages,
           [conversationId]: [...current, message],
+        },
+      }
+    })
+  },
+
+  addOptimisticMessage: (conversationId, optimisticMessage) => {
+    set((state) => {
+      const current = state.messages[conversationId] || []
+      return {
+        messages: {
+          ...state.messages,
+          [conversationId]: [...current, optimisticMessage],
+        },
+      }
+    })
+  },
+
+  confirmOptimisticMessage: (conversationId, tempId, confirmedMessage) => {
+    set((state) => {
+      const current = state.messages[conversationId] || []
+      return {
+        messages: {
+          ...state.messages,
+          [conversationId]: current.map((m) =>
+            m._id === tempId || m.tempId === tempId ? { ...confirmedMessage, tempId: null } : m
+          ),
+        },
+      }
+    })
+  },
+
+  failOptimisticMessage: (conversationId, tempId, errorText = '') => {
+    set((state) => {
+      const current = state.messages[conversationId] || []
+      return {
+        messages: {
+          ...state.messages,
+          [conversationId]: current.map((m) =>
+            m._id === tempId || m.tempId === tempId
+              ? { ...m, status: 'failed', errorMessage: errorText }
+              : m
+          ),
         },
       }
     })
@@ -93,7 +135,7 @@ export const useMessageStore = create((set, get) => ({
       return {
         messages: {
           ...state.messages,
-          [conversationId]: current.filter((m) => m._id !== messageId),
+          [conversationId]: current.filter((m) => m._id !== messageId && m.tempId !== messageId),
         },
       }
     })

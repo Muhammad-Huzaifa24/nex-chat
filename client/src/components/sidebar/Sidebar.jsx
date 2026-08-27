@@ -15,9 +15,12 @@ import {
   MoreVertical,
 } from 'lucide-react'
 
+import { useDebounce } from '../../hooks/useDebounce'
+
 export const Sidebar = ({ onOpenNewChat, onOpenNewGroup }) => {
   const [searchVal, setSearchVal] = useState('')
   const [showMenu, setShowMenu] = useState(false)
+  const debouncedSearch = useDebounce(searchVal, 250)
 
   const { user, logout } = useAuthStore()
   const { theme, toggleTheme } = useThemeStore()
@@ -29,10 +32,10 @@ export const Sidebar = ({ onOpenNewChat, onOpenNewGroup }) => {
     typingUsers,
   } = useConversationStore()
 
-  // Filter conversations by search input
+  // Filter conversations by debounced search input
   const filteredConversations = conversations.filter((c) => {
-    if (!searchVal.trim()) return true
-    const term = searchVal.toLowerCase()
+    if (!debouncedSearch.trim()) return true
+    const term = debouncedSearch.toLowerCase()
     if (c.isGroup) {
       return c.groupName?.toLowerCase().includes(term)
     }
@@ -194,13 +197,13 @@ export const Sidebar = ({ onOpenNewChat, onOpenNewGroup }) => {
         {filteredConversations.length === 0 ? (
           <div
             style={{
-              padding: 32,
+              padding: '32px 16px',
               textAlign: 'center',
               color: 'var(--text-muted)',
-              fontSize: 'var(--font-size-sm)',
+              fontSize: 'var(--font-size-xs)',
             }}
           >
-            {searchVal ? 'No chats match your search' : 'No conversations yet. Start a new chat!'}
+            {searchVal ? `No chats found for "${searchVal}"` : 'No conversations yet. Start a new chat!'}
           </div>
         ) : (
           filteredConversations.map((conv) => {

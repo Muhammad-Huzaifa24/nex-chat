@@ -1,8 +1,9 @@
-import React, { useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { EmptyChat } from './EmptyChat'
 import { ChatHeader } from './ChatHeader'
 import { MessageList } from './MessageList'
 import { MessageInput } from './MessageInput'
+import { DeleteMessageModal } from '../modals/DeleteMessageModal'
 import { useAuthStore } from '../../store/authStore'
 import { useConversationStore } from '../../store/conversationStore'
 import { useMessageStore } from '../../store/messageStore'
@@ -23,12 +24,17 @@ export const ChatArea = ({ onBack, onImageClick }) => {
     messages,
     fetchMessages,
     addMessage,
+    addOptimisticMessage,
+    confirmOptimisticMessage,
+    failOptimisticMessage,
     updateReaction,
     deleteMessageLocal,
     replyingTo,
     setReplyingTo,
     isLoading,
   } = useMessageStore()
+
+  const [deleteTargetMessage, setDeleteTargetMessage] = useState(null)
 
   const socket = getSocket(token)
   const currentMessages = activeConversation ? messages[activeConversation._id] || [] : []
@@ -47,9 +53,53 @@ export const ChatArea = ({ onBack, onImageClick }) => {
     return <EmptyChat />
   }
 
-  const handleSendMessage = async ({ content, file, type, replyTo }) => {
+  const handleSendMessage = async ({ content, file, type, replyTo, retryTempId }) => {
+    const tempId = retryTempId || `temp_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`
+
+    // Optimistic Preview Setup
+    let optimisticAttachmentUrl = ''
+    let optimisticAttachmentMeta = {}
+
     if (file) {
-      // Send via multipart upload endpoint
+      if (type === 'image' || type === 'video') {
+        optimisticAttachmentUrl = URL.createObjectURL(file)
+      }
+      optimisticAttachmentMeta = {
+        filename: file.name || 'Attachment',
+        size: file.size || 0,
+        mimeType: file.type || '',
+      }
+    }
+
+    const optimisticMsg = {
+      _id: tempId,
+      tempId,
+      conversationId: activeConversation._id,
+      senderId: {
+        _id: user._id,
+        displayName: user.displayName,
+        username: user.username,
+        avatar: user.avatar,
+      },
+      content: content ? content.trim() : '',
+      type: type || 'text',
+      attachmentUrl: optimisticAttachmentUrl,
+      attachmentMeta: optimisticAttachmentMeta,
+      replyTo: replyTo || null,
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+      reactions: [],
+      deletedFor: [],
+      isDeletedForEveryone: false,
+      _originalData: { content, file, type, replyTo },
+    }
+
+    if (!retryTempId) {
+      addOptimisticMessage(activeConversation._id, optimisticMsg)
+      updateLastMessage(activeConversation._id, optimisticMsg)
+    }
+
+    if (file) {
       const formData = new FormData()
       formData.append('conversationId', activeConversation._id)
       formData.append('content', content || '')
@@ -62,46 +112,55 @@ export const ChatArea = ({ onBack, onImageClick }) => {
           headers: { 'Content-Type': 'multipart/form-data' },
         })
         const newMsg = res.data.message
-        addMessage(activeConversation._id, newMsg)
+        confirmOptimisticMessage(activeConversation._id, tempId, newMsg)
         updateLastMessage(activeConversation._id, newMsg)
 
-        // Also emit to socket so recipients get realtime notification
         if (socket) {
           socket.emit('message:new', { message: newMsg, conversationId: activeConversation._id })
         }
       } catch (err) {
         console.error('Failed to send file message', err)
-        const errorMsg = err.response?.data?.message || 'Failed to upload media. Please try again.'
-        useToastStore.getState().addToast(errorMsg, 'error', 5000)
+        const errorMsg = err.response?.data?.message || 'Failed to upload media.'
+        failOptimisticMessage(activeConversation._id, tempId, errorMsg)
+        useToastStore.getState().addToast(errorMsg, 'error', 4500)
       }
     } else {
-      // Direct text via Socket or API
-      if (socket) {
-        socket.emit(
-          'message:send',
-          {
-            conversationId: activeConversation._id,
-            content,
-            type: 'text',
-            replyTo,
-          },
-          (res) => {
-            if (res && res.message) {
-              addMessage(activeConversation._id, res.message)
-              updateLastMessage(activeConversation._id, res.message)
-            }
-          }
-        )
-      } else {
+      // Text message
+      try {
         const res = await api.post('/messages', {
           conversationId: activeConversation._id,
           content,
           type: 'text',
           replyTo,
         })
-        addMessage(activeConversation._id, res.data.message)
-        updateLastMessage(activeConversation._id, res.data.message)
+        const newMsg = res.data.message
+        confirmOptimisticMessage(activeConversation._id, tempId, newMsg)
+        updateLastMessage(activeConversation._id, newMsg)
+
+        if (socket) {
+          socket.emit('message:new', { message: newMsg, conversationId: activeConversation._id })
+        }
+      } catch (err) {
+        console.error('Failed to send text message', err)
+        const errorMsg = err.response?.data?.message || 'Failed to send message.'
+        failOptimisticMessage(activeConversation._id, tempId, errorMsg)
       }
+    }
+  }
+
+  const handleRetry = (msg) => {
+    if (msg._originalData) {
+      handleSendMessage({
+        ...msg._originalData,
+        retryTempId: msg.tempId || msg._id,
+      })
+    } else {
+      handleSendMessage({
+        content: msg.content,
+        type: msg.type || 'text',
+        replyTo: msg.replyTo?._id || msg.replyTo,
+        retryTempId: msg.tempId || msg._id,
+      })
     }
   }
 
@@ -124,29 +183,37 @@ export const ChatArea = ({ onBack, onImageClick }) => {
   }
 
   const handleReact = async (messageId, emoji) => {
+    // Optimistic local update for instantaneous UI feedback
+    const currentMsg = currentMessages.find((m) => m._id === messageId)
+    if (currentMsg) {
+      const existingIdx = (currentMsg.reactions || []).findIndex(
+        (r) => (r.userId?._id || r.userId)?.toString() === user?._id?.toString() && r.emoji === emoji
+      )
+      let newReactions = [...(currentMsg.reactions || [])]
+      if (existingIdx > -1) {
+        newReactions.splice(existingIdx, 1)
+      } else {
+        newReactions = newReactions.filter(
+          (r) => (r.userId?._id || r.userId)?.toString() !== user?._id?.toString()
+        )
+        newReactions.push({ userId: user?._id, emoji })
+      }
+      updateReaction(activeConversation._id, messageId, newReactions)
+    }
+
     try {
       const res = await api.post(`/messages/${messageId}/react`, { emoji })
+      // Server Pusher event already broadcasts the update to all conversation members.
+      // Update local state with the fully-populated server response.
       updateReaction(activeConversation._id, messageId, res.data.reactions)
-      if (socket) {
-        socket.emit('message:react', {
-          messageId,
-          emoji,
-          conversationId: activeConversation._id,
-        })
-      }
     } catch (err) {
       console.error('Reaction error', err)
     }
   }
 
-  const handleDelete = async (msg) => {
-    const isSender = msg.senderId?._id === user?._id
-    let deleteFor = 'me'
-
-    if (isSender) {
-      const confirmForEveryone = window.confirm('Delete for everyone? (Cancel to delete for me only)')
-      deleteFor = confirmForEveryone ? 'everyone' : 'me'
-    }
+  const handleConfirmDelete = async (deleteFor) => {
+    if (!deleteTargetMessage) return
+    const msg = deleteTargetMessage
 
     try {
       await api.delete(`/messages/${msg._id}?deleteFor=${deleteFor}`)
@@ -160,6 +227,8 @@ export const ChatArea = ({ onBack, onImageClick }) => {
       }
     } catch (err) {
       console.error('Delete error', err)
+    } finally {
+      setDeleteTargetMessage(null)
     }
   }
 
@@ -191,17 +260,28 @@ export const ChatArea = ({ onBack, onImageClick }) => {
         isGroup={activeConversation.isGroup}
         onReply={(msg) => setReplyingTo(msg)}
         onReact={handleReact}
-        onDelete={handleDelete}
+        onDelete={(msg) => setDeleteTargetMessage(msg)}
+        onRetry={handleRetry}
         onImageClick={onImageClick}
         isLoading={isLoading}
       />
 
       <MessageInput
+        activeConversationId={activeConversation._id}
         onSendMessage={handleSendMessage}
         onTypingStart={handleTypingStart}
         onTypingStop={handleTypingStop}
         replyingTo={replyingTo}
         onCancelReply={() => setReplyingTo(null)}
+      />
+
+      {/* Custom Delete Confirmation Modal */}
+      <DeleteMessageModal
+        isOpen={Boolean(deleteTargetMessage)}
+        onClose={() => setDeleteTargetMessage(null)}
+        message={deleteTargetMessage}
+        currentUserId={user?._id}
+        onDeleteConfirm={handleConfirmDelete}
       />
     </div>
   )

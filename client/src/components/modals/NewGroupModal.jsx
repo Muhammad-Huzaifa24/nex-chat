@@ -7,11 +7,13 @@ import { useConversationStore } from '../../store/conversationStore'
 import { getSocket } from '../../socket/socket'
 import { useAuthStore } from '../../store/authStore'
 import { useToastStore } from '../../store/toastStore'
+import { useDebounce } from '../../hooks/useDebounce'
 
 export const NewGroupModal = ({ isOpen, onClose }) => {
   const [step, setStep] = useState(1) // 1 = select participants, 2 = group info
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
+  const [isSearching, setIsSearching] = useState(false)
   const [selectedUsers, setSelectedUsers] = useState([])
   const [groupName, setGroupName] = useState('')
   const [groupDescription, setGroupDescription] = useState('')
@@ -19,6 +21,7 @@ export const NewGroupModal = ({ isOpen, onClose }) => {
   const [avatarPreview, setAvatarPreview] = useState(null)
   const [loading, setLoading] = useState(false)
 
+  const debouncedQuery = useDebounce(query, 1500)
   const { setActiveConversation, addOrUpdateConversation } = useConversationStore()
   const { token } = useAuthStore()
   const { addToast } = useToastStore()
@@ -27,6 +30,7 @@ export const NewGroupModal = ({ isOpen, onClose }) => {
     if (!isOpen) {
       setStep(1)
       setQuery('')
+      setResults([])
       setSelectedUsers([])
       setGroupName('')
       setGroupDescription('')
@@ -35,21 +39,26 @@ export const NewGroupModal = ({ isOpen, onClose }) => {
       return
     }
 
-    const timer = setTimeout(async () => {
-      if (!query.trim()) {
-        setResults([])
-        return
-      }
+    if (!debouncedQuery.trim()) {
+      setResults([])
+      setIsSearching(false)
+      return
+    }
+
+    const searchUsers = async () => {
+      setIsSearching(true)
       try {
-        const res = await api.get(`/users/search?q=${encodeURIComponent(query)}`)
-        setResults(res.data.users)
+        const res = await api.get(`/users/search?q=${encodeURIComponent(debouncedQuery.trim())}`)
+        setResults(res.data.users || [])
       } catch (err) {
         console.error('Search error', err)
+      } finally {
+        setIsSearching(false)
       }
-    }, 300)
+    }
 
-    return () => clearTimeout(timer)
-  }, [query, isOpen])
+    searchUsers()
+  }, [debouncedQuery, isOpen])
 
   const toggleUser = (user) => {
     if (selectedUsers.some((u) => u._id === user._id)) {
@@ -180,10 +189,23 @@ export const NewGroupModal = ({ isOpen, onClose }) => {
               }}
               autoFocus
             />
+            {isSearching && <Loader2 size={16} className="animate-spin" color="var(--primary-color)" />}
           </div>
 
           {/* User Results */}
           <div style={{ maxHeight: 240, overflowY: 'auto', marginBottom: 16 }}>
+            {isSearching && results.length === 0 && (
+              <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)' }}>
+                Searching users...
+              </div>
+            )}
+
+            {!isSearching && debouncedQuery.trim() && results.length === 0 && (
+              <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)' }}>
+                No user found for "{debouncedQuery}"
+              </div>
+            )}
+
             {results.map((user) => {
               const isSelected = selectedUsers.some((u) => u._id === user._id)
               return (
@@ -205,7 +227,20 @@ export const NewGroupModal = ({ isOpen, onClose }) => {
                     <div style={{ fontWeight: 600, fontSize: 'var(--font-size-base)' }}>{user.displayName}</div>
                     <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)' }}>@{user.username}</div>
                   </div>
-                  <input type="checkbox" checked={isSelected} readOnly style={{ accentColor: 'var(--primary-color)' }} />
+                  <div
+                    style={{
+                      width: 20,
+                      height: 20,
+                      borderRadius: 'var(--radius-full)',
+                      border: isSelected ? 'none' : '2px solid var(--border-color)',
+                      backgroundColor: isSelected ? 'var(--primary-color)' : 'transparent',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    {isSelected && <span style={{ color: 'white', fontSize: 12, fontWeight: 'bold' }}>✓</span>}
+                  </div>
                 </div>
               )
             })}

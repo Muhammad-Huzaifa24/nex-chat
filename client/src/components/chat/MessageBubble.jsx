@@ -1,5 +1,16 @@
 import React, { useState } from 'react'
-import { Check, CheckCheck, FileText, Download, Reply, Smile, Trash2, MoreHorizontal } from 'lucide-react'
+import {
+  Check,
+  CheckCheck,
+  FileText,
+  Download,
+  Reply,
+  Smile,
+  Trash2,
+  Clock,
+  AlertCircle,
+  RotateCcw,
+} from 'lucide-react'
 import { ReactionPicker } from './ReactionPicker'
 
 export const MessageBubble = ({
@@ -9,13 +20,17 @@ export const MessageBubble = ({
   onReply,
   onReact,
   onDelete,
+  onRetry,
   onImageClick,
 }) => {
   const [showOptions, setShowOptions] = useState(false)
   const [showReactionPicker, setShowReactionPicker] = useState(false)
+  const [imageHovered, setImageHovered] = useState(false)
 
-  const isOutgoing = message.senderId?._id === currentUserId
+  const isOutgoing = message.senderId?._id === currentUserId || message.senderId === currentUserId
   const isDeleted = message.isDeletedForEveryone
+  const isPending = message.status === 'pending'
+  const isFailed = message.status === 'failed'
 
   const formatTime = (dateStr) => {
     if (!dateStr) return ''
@@ -46,7 +61,6 @@ export const MessageBubble = ({
       onMouseEnter={() => setShowOptions(true)}
       onMouseLeave={() => {
         setShowOptions(false)
-        setShowReactionPicker(false)
       }}
     >
       <div
@@ -54,10 +68,36 @@ export const MessageBubble = ({
           display: 'flex',
           alignItems: 'center',
           flexDirection: isOutgoing ? 'row-reverse' : 'row',
-          gap: 6,
-          maxWidth: '75%',
+          gap: 8,
+          maxWidth: '78%',
         }}
       >
+        {/* Failed Retry Icon on side of bubble */}
+        {isFailed && isOutgoing && (
+          <button
+            onClick={() => onRetry && onRetry(message)}
+            title="Failed to send. Click to retry"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 32,
+              height: 32,
+              borderRadius: 'var(--radius-full)',
+              backgroundColor: 'rgba(239, 68, 68, 0.12)',
+              border: '1px solid var(--accent-red)',
+              color: 'var(--accent-red)',
+              cursor: 'pointer',
+              transition: 'transform 0.15s ease',
+              flexShrink: 0,
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.1)')}
+            onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+          >
+            <RotateCcw size={15} />
+          </button>
+        )}
+
         {/* Message Bubble Box */}
         <div
           style={{
@@ -66,11 +106,12 @@ export const MessageBubble = ({
             borderRadius: 'var(--radius-md)',
             borderTopRightRadius: isOutgoing ? 0 : 'var(--radius-md)',
             borderTopLeftRadius: !isOutgoing ? 0 : 'var(--radius-md)',
-            padding: '8px 12px',
+            padding: message.type === 'image' && !message.content ? '4px' : '8px 12px',
             boxShadow: 'var(--shadow-sm)',
             position: 'relative',
             minWidth: 90,
             wordBreak: 'break-word',
+            border: isFailed ? '1px solid var(--accent-red)' : 'none',
           }}
         >
           {/* Sender Name in Groups */}
@@ -81,6 +122,7 @@ export const MessageBubble = ({
                 fontWeight: 600,
                 color: 'var(--primary-color)',
                 marginBottom: 4,
+                padding: message.type === 'image' && !message.content ? '4px 8px 0 8px' : 0,
               }}
             >
               {message.senderId?.displayName || message.senderId?.username}
@@ -110,20 +152,131 @@ export const MessageBubble = ({
 
           {/* Deleted Message State */}
           {isDeleted ? (
-            <div style={{ fontStyle: 'italic', color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)' }}>
+            <div style={{ fontStyle: 'italic', color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)', padding: '4px 0' }}>
               🚫 This message was deleted
             </div>
           ) : (
             <>
-              {/* Media: Image */}
+              {/* Media: Image with Blur Hover Effect and Top Action Icons */}
               {message.type === 'image' && message.attachmentUrl && (
-                <div style={{ marginBottom: 6, borderRadius: 'var(--radius-sm)', overflow: 'hidden', cursor: 'pointer' }}>
+                <div
+                  style={{
+                    position: 'relative',
+                    marginBottom: message.content ? 6 : 0,
+                    borderRadius: 'var(--radius-sm)',
+                    overflow: 'hidden',
+                    cursor: 'pointer',
+                  }}
+                  onMouseEnter={() => setImageHovered(true)}
+                  onMouseLeave={() => setImageHovered(false)}
+                >
                   <img
                     src={message.attachmentUrl}
                     alt="attachment"
-                    style={{ maxHeight: 280, width: '100%', objectFit: 'cover' }}
+                    style={{
+                      maxHeight: 300,
+                      width: '100%',
+                      objectFit: 'cover',
+                      display: 'block',
+                      borderRadius: 'var(--radius-sm)',
+                      transition: 'opacity 0.2s ease',
+                      opacity: imageHovered ? 0.9 : 1,
+                    }}
                     onClick={() => onImageClick && onImageClick(message.attachmentUrl)}
                   />
+
+                  {/* Frosted Blur Overlay with Action Buttons on Hover */}
+                  {imageHovered && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        inset: 0,
+                        backgroundColor: 'rgba(0, 0, 0, 0.38)',
+                        backdropFilter: 'blur(3px)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 14,
+                        animation: 'fadeIn 0.18s ease forwards',
+                        zIndex: 2,
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <button
+                        onClick={() => {
+                          setShowReactionPicker(!showReactionPicker)
+                        }}
+                        title="React"
+                        style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: 'var(--radius-full)',
+                          backgroundColor: 'rgba(255, 255, 255, 0.25)',
+                          backdropFilter: 'blur(8px)',
+                          border: '1px solid rgba(255, 255, 255, 0.3)',
+                          color: '#ffffff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                          transition: 'transform 0.15s ease',
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.15)')}
+                        onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+                      >
+                        <Smile size={18} />
+                      </button>
+
+                      <button
+                        onClick={() => onReply(message)}
+                        title="Reply"
+                        style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: 'var(--radius-full)',
+                          backgroundColor: 'rgba(255, 255, 255, 0.25)',
+                          backdropFilter: 'blur(8px)',
+                          border: '1px solid rgba(255, 255, 255, 0.3)',
+                          color: '#ffffff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                          transition: 'transform 0.15s ease',
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.15)')}
+                        onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+                      >
+                        <Reply size={18} />
+                      </button>
+
+                      <button
+                        onClick={() => onDelete(message)}
+                        title="Delete"
+                        style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: 'var(--radius-full)',
+                          backgroundColor: 'rgba(239, 68, 68, 0.5)',
+                          backdropFilter: 'blur(8px)',
+                          border: '1px solid rgba(255, 255, 255, 0.3)',
+                          color: '#ffffff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                          transition: 'transform 0.15s ease',
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.15)')}
+                        onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -148,7 +301,7 @@ export const MessageBubble = ({
               )}
 
               {/* Media: File / Document */}
-              {message.type === 'file' && message.attachmentUrl && (
+              {message.type === 'file' && (
                 <div
                   style={{
                     display: 'flex',
@@ -169,15 +322,17 @@ export const MessageBubble = ({
                       {formatBytes(message.attachmentMeta?.size)}
                     </div>
                   </div>
-                  <a
-                    href={message.attachmentUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    download
-                    style={{ color: 'var(--primary-color)', padding: 4 }}
-                  >
-                    <Download size={18} />
-                  </a>
+                  {message.attachmentUrl && (
+                    <a
+                      href={message.attachmentUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      download
+                      style={{ color: 'var(--primary-color)', padding: 4 }}
+                    >
+                      <Download size={18} />
+                    </a>
+                  )}
                 </div>
               )}
 
@@ -188,6 +343,7 @@ export const MessageBubble = ({
                     fontSize: 'var(--font-size-base)',
                     lineHeight: 1.4,
                     whiteSpace: 'pre-wrap',
+                    padding: message.type === 'image' ? '4px 6px' : 0,
                   }}
                 >
                   {message.content}
@@ -196,7 +352,7 @@ export const MessageBubble = ({
             </>
           )}
 
-          {/* Timestamp & Status ticks */}
+          {/* Timestamp & Status ticks / Pending clock / Failed indicator */}
           <div
             style={{
               display: 'flex',
@@ -205,26 +361,44 @@ export const MessageBubble = ({
               gap: 4,
               marginTop: 2,
               fontSize: 'var(--font-size-xs)',
-              color: isOutgoing ? 'var(--bubble-outgoing-meta)' : 'var(--bubble-incoming-meta)',
+              color: isFailed
+                ? 'var(--accent-red)'
+                : isOutgoing
+                  ? 'var(--bubble-outgoing-meta)'
+                  : 'var(--bubble-incoming-meta)',
+              padding: message.type === 'image' && !message.content ? '0 6px 4px 0' : 0,
             }}
           >
-            <span>{formatTime(message.createdAt)}</span>
-            {isOutgoing && !isDeleted && (
-              <span>
-                {message.status === 'read' ? (
-                  <CheckCheck size={14} color="var(--tick-read)" />
-                ) : message.status === 'delivered' ? (
-                  <CheckCheck size={14} color="var(--tick-delivered)" />
-                ) : (
-                  <Check size={14} color="var(--tick-sent)" />
-                )}
+            {isFailed ? (
+              <span
+                onClick={() => onRetry && onRetry(message)}
+                style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4, fontWeight: 500 }}
+              >
+                <AlertCircle size={12} /> Not sent · Tap to retry
               </span>
+            ) : (
+              <>
+                <span>{formatTime(message.createdAt)}</span>
+                {isOutgoing && !isDeleted && (
+                  <span>
+                    {isPending ? (
+                      <Clock size={13} style={{ opacity: 0.75 }} />
+                    ) : message.status === 'read' ? (
+                      <CheckCheck size={14} color="var(--tick-read)" />
+                    ) : message.status === 'delivered' ? (
+                      <CheckCheck size={14} color="var(--tick-delivered)" />
+                    ) : (
+                      <Check size={14} color="var(--tick-sent)" />
+                    )}
+                  </span>
+                )}
+              </>
             )}
           </div>
         </div>
 
-        {/* Action Controls (Reply, React, Delete) */}
-        {showOptions && !isDeleted && (
+        {/* Action Controls for Non-Image messages (Reply, React, Delete) */}
+        {showOptions && !isDeleted && message.type !== 'image' && !isFailed && !isPending && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <button
               onClick={() => setShowReactionPicker(!showReactionPicker)}
@@ -256,14 +430,14 @@ export const MessageBubble = ({
 
       {/* Floating Reaction Picker */}
       {showReactionPicker && (
-        <div style={{ marginTop: 4 }}>
-          <ReactionPicker
-            onSelectEmoji={(emoji) => {
-              onReact(message._id, emoji)
-              setShowReactionPicker(false)
-            }}
-          />
-        </div>
+        <ReactionPicker
+          isOutgoing={isOutgoing}
+          onSelectEmoji={(emoji) => {
+            onReact(message._id, emoji)
+            setShowReactionPicker(false)
+          }}
+          onClose={() => setShowReactionPicker(false)}
+        />
       )}
 
       {/* Emoji Reactions List below bubble */}
@@ -282,7 +456,9 @@ export const MessageBubble = ({
           {Array.from(new Set(message.reactions.map((r) => r.emoji))).map((emoji) => {
             const count = message.reactions.filter((r) => r.emoji === emoji).length
             const isUserReacted = message.reactions.some(
-              (r) => r.userId === currentUserId && r.emoji === emoji
+              (r) =>
+                (r.userId?._id || r.userId)?.toString() === currentUserId?.toString() &&
+                r.emoji === emoji
             )
             return (
               <button

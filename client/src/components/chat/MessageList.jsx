@@ -8,6 +8,7 @@ export const MessageList = ({
   onReply,
   onReact,
   onDelete,
+  onRetry,
   onImageClick,
   isLoading,
 }) => {
@@ -102,6 +103,7 @@ export const MessageList = ({
               onReply={onReply}
               onReact={onReact}
               onDelete={onDelete}
+              onRetry={onRetry}
               onImageClick={onImageClick}
             />
           </React.Fragment>

@@ -6,6 +6,7 @@ import { LoginPage } from './pages/LoginPage'
 import { RegisterPage } from './pages/RegisterPage'
 import { MainLayout } from './components/layout/MainLayout'
 import { ToastContainer } from './components/ui/Toast'
+import { GlobalLoader } from './components/ui/GlobalLoader'
 import { Loader2 } from 'lucide-react'
 
 // Protected route guard
@@ -68,6 +69,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      <GlobalLoader />
       <ToastContainer />
       <Routes>
         <Route

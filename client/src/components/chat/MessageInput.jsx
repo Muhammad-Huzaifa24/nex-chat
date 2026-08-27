@@ -5,6 +5,7 @@ import { AttachmentMenu } from './AttachmentMenu'
 import { ReplyPreview } from './ReplyPreview'
 
 export const MessageInput = ({
+  activeConversationId,
   onSendMessage,
   onTypingStart,
   onTypingStop,
@@ -20,6 +21,32 @@ export const MessageInput = ({
 
   const textareaRef = useRef(null)
   const typingTimerRef = useRef(null)
+  const isTypingRef = useRef(false)
+
+  // Auto-focus textarea on conversation change and tab switch / window focus
+  useEffect(() => {
+    const focusInput = () => {
+      if (document.visibilityState === 'visible' && textareaRef.current) {
+        textareaRef.current.focus()
+      }
+    }
+
+    focusInput()
+    window.addEventListener('focus', focusInput)
+    document.addEventListener('visibilitychange', focusInput)
+
+    return () => {
+      window.removeEventListener('focus', focusInput)
+      document.removeEventListener('visibilitychange', focusInput)
+    }
+  }, [activeConversationId])
+
+  // Focus on reply change
+  useEffect(() => {
+    if (replyingTo && textareaRef.current) {
+      textareaRef.current.focus()
+    }
+  }, [replyingTo])
 
   // Auto-resize textarea
   useEffect(() => {
@@ -32,10 +59,16 @@ export const MessageInput = ({
   const handleTextChange = (e) => {
     setText(e.target.value)
 
-    // Trigger typing event
-    if (onTypingStart) onTypingStart()
+    // Trigger typing:start only ONCE when typing begins
+    if (!isTypingRef.current) {
+      isTypingRef.current = true
+      if (onTypingStart) onTypingStart()
+    }
+
+    // Debounce typing:stop after 1.5 seconds of inactivity
     if (typingTimerRef.current) clearTimeout(typingTimerRef.current)
     typingTimerRef.current = setTimeout(() => {
+      isTypingRef.current = false
       if (onTypingStop) onTypingStop()
     }, 1500)
   }
@@ -50,13 +83,22 @@ export const MessageInput = ({
   const handleFileSelect = (file, type) => {
     setSelectedFile(file)
     setFileType(type)
+    setTimeout(() => {
+      textareaRef.current?.focus()
+    }, 50)
   }
 
   const handleSend = async () => {
     if ((!text.trim() && !selectedFile) || isSending) return
 
     setIsSending(true)
-    if (onTypingStop) onTypingStop()
+    
+    // Immediately stop typing indicator
+    if (typingTimerRef.current) clearTimeout(typingTimerRef.current)
+    if (isTypingRef.current) {
+      isTypingRef.current = false
+      if (onTypingStop) onTypingStop()
+    }
 
     await onSendMessage({
       content: text,
@@ -73,6 +115,7 @@ export const MessageInput = ({
 
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto'
+      textareaRef.current.focus()
     }
   }
 
@@ -211,6 +254,7 @@ export const MessageInput = ({
         <EmojiPicker
           onEmojiSelect={(emoji) => {
             setText((prev) => prev + emoji)
+            textareaRef.current?.focus()
           }}
           onClose={() => setShowEmoji(false)}
         />

@@ -6,12 +6,14 @@ import api from '../../services/api'
 import { useConversationStore } from '../../store/conversationStore'
 import { getSocket } from '../../socket/socket'
 import { useAuthStore } from '../../store/authStore'
+import { useDebounce } from '../../hooks/useDebounce'
 
 export const NewChatModal = ({ isOpen, onClose }) => {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
   const [loading, setLoading] = useState(false)
 
+  const debouncedQuery = useDebounce(query, 1500)
   const { setActiveConversation, addOrUpdateConversation } = useConversationStore()
   const { token } = useAuthStore()
 
@@ -19,27 +21,30 @@ export const NewChatModal = ({ isOpen, onClose }) => {
     if (!isOpen) {
       setQuery('')
       setResults([])
+      setLoading(false)
       return
     }
 
-    const timer = setTimeout(async () => {
-      if (!query.trim()) {
-        setResults([])
-        return
-      }
+    if (!debouncedQuery.trim()) {
+      setResults([])
+      setLoading(false)
+      return
+    }
+
+    const searchUsers = async () => {
       setLoading(true)
       try {
-        const res = await api.get(`/users/search?q=${encodeURIComponent(query)}`)
-        setResults(res.data.users)
+        const res = await api.get(`/users/search?q=${encodeURIComponent(debouncedQuery.trim())}`)
+        setResults(res.data.users || [])
       } catch (err) {
         console.error('User search error', err)
       } finally {
         setLoading(false)
       }
-    }, 300)
+    }
 
-    return () => clearTimeout(timer)
-  }, [query, isOpen])
+    searchUsers()
+  }, [debouncedQuery, isOpen])
 
   const handleSelectUser = async (user) => {
     try {

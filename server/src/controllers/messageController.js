@@ -3,6 +3,7 @@ import Conversation from '../models/Conversation.js'
 import { uploadMediaToCloudinary } from '../services/cloudinaryService.js'
 import { FILE_LIMITS } from '../middleware/uploadMiddleware.js'
 import { triggerPusherEvent } from '../config/pusher.js'
+import { sendOfflineNotification } from '../services/emailService.js'
 
 // @desc    Get messages for a conversation (paginated)
 // @route   GET /api/messages/:conversationId
@@ -150,6 +151,20 @@ export const sendMessage = async (req, res) => {
       conversationId,
     })
 
+    // Send email notification to offline participants (async non-blocking)
+    Conversation.findById(conversationId)
+      .populate('participants', 'username displayName email isOnline lastNotifiedAt')
+      .then((conv) => {
+        if (!conv || !conv.participants) return
+        const offlineRecipients = conv.participants.filter(
+          (p) => p._id.toString() !== userId.toString() && !p.isOnline
+        )
+        offlineRecipients.forEach((recipient) => {
+          sendOfflineNotification(recipient, req.user, populated, conv)
+        })
+      })
+      .catch((err) => console.error('[Offline Email Error]', err))
+
     res.status(201).json({ success: true, message: populated })
   } catch (error) {
     console.error('[Send Message Error]', error)
@@ -226,13 +241,18 @@ export const reactToMessage = async (req, res) => {
 
     await message.save()
 
+    // Populate userId in reactions so client gets full user data
+    const populated = await Message.findById(id).populate('reactions.userId', '_id displayName username avatar')
+
+    const populatedReactions = populated.reactions
+
     triggerPusherEvent(`conversation-${message.conversationId}`, 'message:reaction_update', {
       messageId: id,
-      reactions: message.reactions,
+      reactions: populatedReactions,
       conversationId: message.conversationId,
     })
 
-    res.status(200).json({ success: true, reactions: message.reactions })
+    res.status(200).json({ success: true, reactions: populatedReactions })
   } catch (error) {
     res.status(500).json({ success: false, message: error.message })
   }

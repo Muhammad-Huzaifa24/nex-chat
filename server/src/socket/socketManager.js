@@ -184,9 +184,11 @@ export const initializeSocket = (httpServer) => {
 
         await message.save()
 
+        const populated = await Message.findById(messageId).populate('reactions.userId', '_id displayName username avatar')
+
         io.to(conversationId).emit('message:reaction_update', {
           messageId,
-          reactions: message.reactions,
+          reactions: populated.reactions,
           conversationId,
         })
       } catch (err) {
