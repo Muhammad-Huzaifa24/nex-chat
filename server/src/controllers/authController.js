@@ -1,11 +1,13 @@
 import User from '../models/User.js'
 import { generateToken } from '../utils/jwt.js'
 
+const isProd = process.env.NODE_ENV === 'production'
+
 const cookieOptions = {
   httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
-  sameSite: 'lax',
-  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  secure: isProd,                       // true in prod (https), false in local dev (http)
+  sameSite: isProd ? 'none' : 'lax',    // 'none' needed cross-site in prod, 'lax' fine locally
+  maxAge: 7 * 24 * 60 * 60 * 1000,
 }
 
 // @desc    Register a new user
@@ -116,7 +118,11 @@ export const logout = async (req, res) => {
         lastSeen: new Date(),
       })
     }
-    res.clearCookie('token')
+    res.clearCookie('token', {
+      httpOnly: true,
+      secure: isProd,
+      sameSite: isProd ? 'none' : 'lax',
+    })
     res.status(200).json({ success: true, message: 'Logged out successfully' })
   } catch (error) {
     res.status(500).json({ success: false, message: error.message })
