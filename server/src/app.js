@@ -24,25 +24,12 @@ const ALLOWED_ORIGINS = [
 ].filter(Boolean)
 
 const corsOptions = {
-  // origin: true mirrors the exact request Origin back — works with credentials
-  // without the wildcard '*' restriction. Safe for all vercel.app preview URLs.
-  origin: true,
+  origin: 'https://nex-chat-wjpg.vercel.app',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: [
-    'Content-Type',
-    'Authorization',
-    'X-Requested-With',
-    'Accept',
-    'Origin',
-    'Cookie',
-    "Access-Control-Allow-Origin"
-  ],
-  optionsSuccessStatus: 200,
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Requested-With'],
+  optionsSuccessStatus: 204,
 }
-
-// Handle OPTIONS preflight globally FIRST (before any other middleware)
-app.options('*', cors(corsOptions))
 
 // Apply CORS to all routes
 app.use(cors(corsOptions))
