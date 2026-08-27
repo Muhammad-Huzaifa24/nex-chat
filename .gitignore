@@ -45,6 +45,7 @@ desktop.ini
 !package.json
 !package-lock.json
 !tsconfig.json
+!vercel.json
 
 # ─── Misc ─────────────────────────────────────────────────────
 *.local
