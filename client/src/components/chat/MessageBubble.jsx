@@ -48,6 +48,36 @@ export const MessageBubble = ({
     return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i]
   }
 
+  const [showImageActions, setShowImageActions] = useState(false)
+  const touchTimerRef = React.useRef(null)
+
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 640
+
+  const handleTouchStart = () => {
+    touchTimerRef.current = setTimeout(() => {
+      if (navigator.vibrate) navigator.vibrate(40)
+      setShowImageActions(true)
+    }, 450)
+  }
+
+  const handleTouchEnd = () => {
+    if (touchTimerRef.current) {
+      clearTimeout(touchTimerRef.current)
+      touchTimerRef.current = null
+    }
+  }
+
+  const handleDownload = (e, url, filename = 'image.jpg') => {
+    e.stopPropagation()
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename
+    link.target = '_blank'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
   return (
     <div
       style={{
@@ -61,6 +91,7 @@ export const MessageBubble = ({
       onMouseEnter={() => setShowOptions(true)}
       onMouseLeave={() => {
         setShowOptions(false)
+        setShowImageActions(false)
       }}
     >
       <div
@@ -69,7 +100,8 @@ export const MessageBubble = ({
           alignItems: 'center',
           flexDirection: isOutgoing ? 'row-reverse' : 'row',
           gap: 8,
-          maxWidth: '78%',
+          maxWidth: isMobile ? '85%' : '75%',
+          width: 'fit-content',
         }}
       >
         {/* Failed Retry Icon on side of bubble */}
@@ -110,6 +142,7 @@ export const MessageBubble = ({
             boxShadow: 'var(--shadow-sm)',
             position: 'relative',
             minWidth: 90,
+            maxWidth: '100%',
             wordBreak: 'break-word',
             border: isFailed ? '1px solid var(--accent-red)' : 'none',
           }}
@@ -152,12 +185,12 @@ export const MessageBubble = ({
 
           {/* Deleted Message State */}
           {isDeleted ? (
-            <div style={{ fontStyle: 'italic', color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)', padding: '4px 0' }}>
-              🚫 This message was deleted
+            <div style={{ fontStyle: 'italic', color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)', padding: '4px 0', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 13, opacity: 0.7 }}>🚫</span> This message was deleted
             </div>
           ) : (
             <>
-              {/* Media: Image with Blur Hover Effect and Top Action Icons */}
+              {/* Media: Image with Click/Hover and Touch-Hold Action Icons */}
               {message.type === 'image' && message.attachmentUrl && (
                 <div
                   style={{
@@ -166,114 +199,149 @@ export const MessageBubble = ({
                     borderRadius: 'var(--radius-sm)',
                     overflow: 'hidden',
                     cursor: 'pointer',
+                    maxWidth: 360,
                   }}
                   onMouseEnter={() => setImageHovered(true)}
-                  onMouseLeave={() => setImageHovered(false)}
+                  onMouseLeave={() => {
+                    setImageHovered(false)
+                  }}
+                  onClick={(e) => {
+                    if (imageHovered || showImageActions) {
+                      setShowImageActions(!showImageActions)
+                    } else if (onImageClick) {
+                      onImageClick(message.attachmentUrl)
+                    }
+                  }}
+                  onTouchStart={handleTouchStart}
+                  onTouchEnd={handleTouchEnd}
+                  onTouchMove={handleTouchEnd}
                 >
                   <img
                     src={message.attachmentUrl}
                     alt="attachment"
                     style={{
-                      maxHeight: 300,
+                      maxHeight: isMobile ? 220 : 280,
+                      minHeight: 120,
                       width: '100%',
                       objectFit: 'cover',
                       display: 'block',
                       borderRadius: 'var(--radius-sm)',
                       transition: 'opacity 0.2s ease',
-                      opacity: imageHovered ? 0.9 : 1,
+                      opacity: (imageHovered || showImageActions) ? 0.88 : 1,
                     }}
-                    onClick={() => onImageClick && onImageClick(message.attachmentUrl)}
                   />
 
-                  {/* Frosted Blur Overlay with Action Buttons on Hover */}
-                  {imageHovered && (
+                  {/* Action Buttons Overlay (on hover, on left click, or on mobile touch hold) */}
+                  {(imageHovered || showImageActions) && (
                     <div
                       style={{
                         position: 'absolute',
                         inset: 0,
-                        backgroundColor: 'rgba(0, 0, 0, 0.38)',
-                        backdropFilter: 'blur(3px)',
+                        backgroundColor: 'rgba(0, 0, 0, 0.35)',
+                        backdropFilter: 'blur(2px)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        gap: 14,
-                        animation: 'fadeIn 0.18s ease forwards',
+                        gap: 10,
+                        animation: 'fadeIn 0.15s ease forwards',
                         zIndex: 2,
                       }}
                       onClick={(e) => e.stopPropagation()}
                     >
                       <button
-                        onClick={() => {
-                          setShowReactionPicker(!showReactionPicker)
-                        }}
+                        onClick={() => setShowReactionPicker(!showReactionPicker)}
                         title="React"
                         style={{
-                          width: 36,
-                          height: 36,
+                          width: 34,
+                          height: 34,
                           borderRadius: 'var(--radius-full)',
-                          backgroundColor: 'rgba(255, 255, 255, 0.25)',
-                          backdropFilter: 'blur(8px)',
-                          border: '1px solid rgba(255, 255, 255, 0.3)',
+                          backgroundColor: 'rgba(255, 255, 255, 0.3)',
+                          backdropFilter: 'blur(6px)',
+                          border: '1px solid rgba(255, 255, 255, 0.4)',
                           color: '#ffffff',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           cursor: 'pointer',
-                          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                          boxShadow: '0 4px 10px rgba(0,0,0,0.3)',
                           transition: 'transform 0.15s ease',
                         }}
-                        onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.15)')}
+                        onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.12)')}
                         onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
                       >
-                        <Smile size={18} />
+                        <Smile size={16} />
                       </button>
 
                       <button
                         onClick={() => onReply(message)}
                         title="Reply"
                         style={{
-                          width: 36,
-                          height: 36,
+                          width: 34,
+                          height: 34,
                           borderRadius: 'var(--radius-full)',
-                          backgroundColor: 'rgba(255, 255, 255, 0.25)',
-                          backdropFilter: 'blur(8px)',
-                          border: '1px solid rgba(255, 255, 255, 0.3)',
+                          backgroundColor: 'rgba(255, 255, 255, 0.3)',
+                          backdropFilter: 'blur(6px)',
+                          border: '1px solid rgba(255, 255, 255, 0.4)',
                           color: '#ffffff',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           cursor: 'pointer',
-                          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                          boxShadow: '0 4px 10px rgba(0,0,0,0.3)',
                           transition: 'transform 0.15s ease',
                         }}
-                        onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.15)')}
+                        onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.12)')}
                         onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
                       >
-                        <Reply size={18} />
+                        <Reply size={16} />
+                      </button>
+
+                      <button
+                        onClick={(e) => handleDownload(e, message.attachmentUrl, message.attachmentMeta?.filename || 'image.jpg')}
+                        title="Download image"
+                        style={{
+                          width: 34,
+                          height: 34,
+                          borderRadius: 'var(--radius-full)',
+                          backgroundColor: 'rgba(255, 255, 255, 0.3)',
+                          backdropFilter: 'blur(6px)',
+                          border: '1px solid rgba(255, 255, 255, 0.4)',
+                          color: '#ffffff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          boxShadow: '0 4px 10px rgba(0,0,0,0.3)',
+                          transition: 'transform 0.15s ease',
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.12)')}
+                        onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+                      >
+                        <Download size={16} />
                       </button>
 
                       <button
                         onClick={() => onDelete(message)}
                         title="Delete"
                         style={{
-                          width: 36,
-                          height: 36,
+                          width: 34,
+                          height: 34,
                           borderRadius: 'var(--radius-full)',
-                          backgroundColor: 'rgba(239, 68, 68, 0.5)',
-                          backdropFilter: 'blur(8px)',
-                          border: '1px solid rgba(255, 255, 255, 0.3)',
+                          backgroundColor: 'rgba(239, 68, 68, 0.65)',
+                          backdropFilter: 'blur(6px)',
+                          border: '1px solid rgba(255, 255, 255, 0.4)',
                           color: '#ffffff',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           cursor: 'pointer',
-                          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                          boxShadow: '0 4px 10px rgba(0,0,0,0.3)',
                           transition: 'transform 0.15s ease',
                         }}
-                        onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.15)')}
+                        onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.12)')}
                         onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
                       >
-                        <Trash2 size={18} />
+                        <Trash2 size={16} />
                       </button>
                     </div>
                   )}

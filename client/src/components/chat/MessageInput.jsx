@@ -17,7 +17,6 @@ export const MessageInput = ({
   const [showAttachment, setShowAttachment] = useState(false)
   const [selectedFile, setSelectedFile] = useState(null)
   const [fileType, setFileType] = useState('text')
-  const [isSending, setIsSending] = useState(false)
 
   const textareaRef = useRef(null)
   const typingTimerRef = useRef(null)
@@ -88,11 +87,29 @@ export const MessageInput = ({
     }, 50)
   }
 
-  const handleSend = async () => {
-    if ((!text.trim() && !selectedFile) || isSending) return
+  // Remove isSending blocking state to allow rapid non-blocking message sends
+  const handleSend = () => {
+    const trimmedText = text.trim()
+    if (!trimmedText && !selectedFile) return
 
-    setIsSending(true)
-    
+    const payload = {
+      content: trimmedText,
+      file: selectedFile,
+      type: selectedFile ? fileType : 'text',
+      replyTo: replyingTo?._id,
+    }
+
+    // Immediately clear input fields so user can type the next message instantly
+    setText('')
+    setSelectedFile(null)
+    setFileType('text')
+    if (onCancelReply) onCancelReply()
+
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto'
+      textareaRef.current.focus()
+    }
+
     // Immediately stop typing indicator
     if (typingTimerRef.current) clearTimeout(typingTimerRef.current)
     if (isTypingRef.current) {
@@ -100,23 +117,8 @@ export const MessageInput = ({
       if (onTypingStop) onTypingStop()
     }
 
-    await onSendMessage({
-      content: text,
-      file: selectedFile,
-      type: selectedFile ? fileType : 'text',
-      replyTo: replyingTo?._id,
-    })
-
-    setText('')
-    setSelectedFile(null)
-    setFileType('text')
-    setIsSending(false)
-    if (onCancelReply) onCancelReply()
-
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto'
-      textareaRef.current.focus()
-    }
+    // Fire non-blocking asynchronous send
+    onSendMessage(payload)
   }
 
   return (
@@ -232,7 +234,7 @@ export const MessageInput = ({
         <button
           type="button"
           onClick={handleSend}
-          disabled={(!text.trim() && !selectedFile) || isSending}
+          disabled={!text.trim() && !selectedFile}
           className="btn-primary"
           style={{
             width: 42,
@@ -242,10 +244,12 @@ export const MessageInput = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
+            opacity: (!text.trim() && !selectedFile) ? 0.6 : 1,
+            cursor: (!text.trim() && !selectedFile) ? 'default' : 'pointer',
           }}
-          title="Send"
+          title="Send message"
         >
-          {isSending ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
+          <Send size={18} />
         </button>
       </div>
 

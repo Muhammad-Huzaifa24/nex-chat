@@ -35,27 +35,47 @@ export const Avatar = ({ src, name = 'User', size = 'md', isOnline = false, clas
 
   return (
     <div
-      className={`relative inline-flex items-center justify-center rounded-full flex-shrink-0 ${className}`}
+      className={className}
       style={{
+        position: 'relative',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: '50%',
+        flexShrink: 0,
         width: config.width,
         height: config.height,
         backgroundColor: src ? 'transparent' : getColor(name),
+        overflow: 'visible',
       }}
     >
       {src ? (
         <img
           src={src}
           alt={name}
-          className="w-full h-full object-cover rounded-full"
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            borderRadius: '50%',
+            display: 'block',
+          }}
           onError={(e) => {
             e.currentTarget.style.display = 'none'
-            e.currentTarget.nextSibling.style.display = 'flex'
+            if (e.currentTarget.nextSibling) {
+              e.currentTarget.nextSibling.style.display = 'flex'
+            }
           }}
         />
       ) : null}
       <span
-        className="font-semibold text-white select-none"
         style={{
+          width: '100%',
+          height: '100%',
+          borderRadius: '50%',
+          fontWeight: 600,
+          color: '#ffffff',
+          userSelect: 'none',
           fontSize: config.fontSize,
           display: src ? 'none' : 'flex',
           alignItems: 'center',
@@ -67,12 +87,18 @@ export const Avatar = ({ src, name = 'User', size = 'md', isOnline = false, clas
 
       {isOnline && (
         <span
-          className="absolute bottom-0 right-0 rounded-full border-2"
+          title="Online"
           style={{
+            position: 'absolute',
+            bottom: 0,
+            right: 0,
             width: config.dot,
             height: config.dot,
-            backgroundColor: 'var(--status-online)',
-            borderColor: 'var(--bg-surface)',
+            borderRadius: '50%',
+            backgroundColor: 'var(--status-online, #25d366)',
+            border: '2px solid var(--bg-surface, #ffffff)',
+            boxShadow: '0 0 0 1px rgba(0,0,0,0.1)',
+            zIndex: 2,
           }}
         />
       )}

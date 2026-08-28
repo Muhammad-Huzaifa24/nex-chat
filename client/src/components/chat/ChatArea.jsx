@@ -43,6 +43,8 @@ export const ChatArea = ({ onBack, onImageClick }) => {
   useEffect(() => {
     if (activeConversation) {
       fetchMessages(activeConversation._id)
+      // Call REST endpoint so server updates DB and triggers Pusher read status
+      api.put(`/messages/read/${activeConversation._id}`).catch(() => {})
       if (socket) {
         socket.emit('message:read', { conversationId: activeConversation._id })
       }
@@ -114,10 +116,6 @@ export const ChatArea = ({ onBack, onImageClick }) => {
         const newMsg = res.data.message
         confirmOptimisticMessage(activeConversation._id, tempId, newMsg)
         updateLastMessage(activeConversation._id, newMsg)
-
-        if (socket) {
-          socket.emit('message:new', { message: newMsg, conversationId: activeConversation._id })
-        }
       } catch (err) {
         console.error('Failed to send file message', err)
         const errorMsg = err.response?.data?.message || 'Failed to upload media.'
@@ -136,10 +134,6 @@ export const ChatArea = ({ onBack, onImageClick }) => {
         const newMsg = res.data.message
         confirmOptimisticMessage(activeConversation._id, tempId, newMsg)
         updateLastMessage(activeConversation._id, newMsg)
-
-        if (socket) {
-          socket.emit('message:new', { message: newMsg, conversationId: activeConversation._id })
-        }
       } catch (err) {
         console.error('Failed to send text message', err)
         const errorMsg = err.response?.data?.message || 'Failed to send message.'

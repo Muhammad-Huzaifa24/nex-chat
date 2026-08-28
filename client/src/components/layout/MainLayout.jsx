@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Sidebar } from '../sidebar/Sidebar'
 import { ChatArea } from '../chat/ChatArea'
 import { UserProfilePanel } from '../panels/UserProfilePanel'
@@ -22,6 +22,7 @@ export const MainLayout = () => {
     setActivePanel,
     fetchConversations,
     updateLastMessage,
+    updateLastMessageStatus,
     setUserOnline,
     setTyping,
     addOrUpdateConversation,
@@ -33,6 +34,53 @@ export const MainLayout = () => {
   const [showNewGroup, setShowNewGroup] = useState(false)
   const [lightboxSrc, setLightboxSrc] = useState(null)
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
+
+  const typingTimeoutsRef = useRef({})
+
+  // Request Push Notification permission & register Service Worker immediately on site open
+  useEffect(() => {
+    if ('Notification' in window) {
+      if (Notification.permission === 'default') {
+        Notification.requestPermission().catch(() => {})
+      }
+    }
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch((err) => {
+        console.warn('[SW Registration Error]', err)
+      })
+    }
+  }, [])
+
+  // Helper to trigger native Push Notification when tab is hidden or minimized
+  const triggerPushNotification = (senderName, content, avatar) => {
+    if (document.visibilityState !== 'hidden') return
+    if (!('Notification' in window) || Notification.permission !== 'granted') return
+
+    const title = senderName ? `${senderName} on NexChat` : 'New message on NexChat'
+    const options = {
+      body: content || 'Sent an attachment',
+      icon: avatar || '/favicon.ico',
+      badge: '/favicon.ico',
+      vibrate: [100, 50, 100],
+      tag: 'nexchat-msg',
+      renotify: true,
+    }
+
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.ready
+        .then((registration) => {
+          registration.showNotification(title, options)
+        })
+        .catch(() => {
+          new Notification(title, options)
+        })
+    } else {
+      try {
+        new Notification(title, options)
+      } catch (e) {}
+    }
+  }
 
   // Track responsive screen resize
   useEffect(() => {
@@ -55,6 +103,13 @@ export const MainLayout = () => {
       socket.on('message:new', ({ message, conversationId }) => {
         addMessage(conversationId, message)
         updateLastMessage(conversationId, message)
+
+        const senderId = (message.senderId?._id || message.senderId)?.toString()
+        if (senderId && senderId !== user?._id?.toString()) {
+          const senderName = message.senderId?.displayName || message.senderId?.username || 'New message'
+          const previewText = message.content || (message.type === 'image' ? '📷 Photo' : '📎 Attachment')
+          triggerPushNotification(senderName, previewText, message.senderId?.avatar)
+        }
       })
 
       socket.on('user:online', ({ userId }) => {
@@ -66,15 +121,27 @@ export const MainLayout = () => {
       })
 
       socket.on('typing:start', ({ conversationId, user: typingUser }) => {
-        setTyping(conversationId, typingUser, true)
+        const typingUserId = (typingUser?._id || typingUser)?.toString()
+        if (typingUserId && typingUserId !== user?._id?.toString()) {
+          setTyping(conversationId, typingUser, true)
+          clearTimeout(typingTimeoutsRef.current[`${conversationId}_${typingUserId}`])
+          typingTimeoutsRef.current[`${conversationId}_${typingUserId}`] = setTimeout(() => {
+            setTyping(conversationId, typingUserId, false)
+          }, 4000)
+        }
       })
 
       socket.on('typing:stop', ({ conversationId, userId }) => {
-        setTyping(conversationId, userId, false)
+        const stopUserId = (userId?._id || userId)?.toString()
+        if (stopUserId) {
+          clearTimeout(typingTimeoutsRef.current[`${conversationId}_${stopUserId}`])
+          setTyping(conversationId, stopUserId, false)
+        }
       })
 
-      socket.on('message:status_update', ({ conversationId, status }) => {
-        updateMessageStatus(conversationId, status)
+      socket.on('message:status_update', ({ conversationId, status, readBy }) => {
+        updateMessageStatus(conversationId, status, readBy)
+        updateLastMessageStatus(conversationId, status, readBy)
       })
 
       socket.on('message:reaction_update', ({ messageId, reactions, conversationId }) => {
@@ -90,7 +157,7 @@ export const MainLayout = () => {
       })
     }
 
-    // 2. Pusher User Channel (Serverless Realtime)
+    // 2. Pusher User Channel (Serverless Realtime for incoming messages across all chats)
     if (user?._id) {
       const userChannelName = `user-${user._id}`
       const userChannel = subscribeChannel(userChannelName)
@@ -99,6 +166,13 @@ export const MainLayout = () => {
         userChannel.bind('message:new', ({ message, conversationId }) => {
           addMessage(conversationId, message)
           updateLastMessage(conversationId, message)
+
+          const senderId = (message.senderId?._id || message.senderId)?.toString()
+          if (senderId && senderId !== user?._id?.toString()) {
+            const senderName = message.senderId?.displayName || message.senderId?.username || 'New message'
+            const previewText = message.content || (message.type === 'image' ? '📷 Photo' : '📎 Attachment')
+            triggerPushNotification(senderName, previewText, message.senderId?.avatar)
+          }
         })
       }
 
@@ -108,7 +182,7 @@ export const MainLayout = () => {
     }
   }, [token, user?._id])
 
-  // Pusher Conversation Channel Subscription
+  // Pusher Active Conversation Channel Subscription
   useEffect(() => {
     if (!activeConversation?._id) return
 
@@ -119,10 +193,18 @@ export const MainLayout = () => {
       channel.bind('message:new', ({ message, conversationId }) => {
         addMessage(conversationId, message)
         updateLastMessage(conversationId, message)
+
+        const senderId = (message.senderId?._id || message.senderId)?.toString()
+        if (senderId && senderId !== user?._id?.toString()) {
+          const senderName = message.senderId?.displayName || message.senderId?.username || 'New message'
+          const previewText = message.content || (message.type === 'image' ? '📷 Photo' : '📎 Attachment')
+          triggerPushNotification(senderName, previewText, message.senderId?.avatar)
+        }
       })
 
-      channel.bind('message:status_update', ({ conversationId, status }) => {
-        updateMessageStatus(conversationId, status)
+      channel.bind('message:status_update', ({ conversationId, status, readBy }) => {
+        updateMessageStatus(conversationId, status, readBy)
+        updateLastMessageStatus(conversationId, status, readBy)
       })
 
       channel.bind('message:reaction_update', ({ messageId, reactions, conversationId }) => {
@@ -134,18 +216,30 @@ export const MainLayout = () => {
       })
 
       channel.bind('typing:start', ({ conversationId, user: typingUser }) => {
-        setTyping(conversationId, typingUser, true)
+        const typingUserId = (typingUser?._id || typingUser)?.toString()
+        // Prevent typing self-echo: only show indicator if someone else is typing
+        if (typingUserId && typingUserId !== user?._id?.toString()) {
+          setTyping(conversationId, typingUser, true)
+          clearTimeout(typingTimeoutsRef.current[`${conversationId}_${typingUserId}`])
+          typingTimeoutsRef.current[`${conversationId}_${typingUserId}`] = setTimeout(() => {
+            setTyping(conversationId, typingUserId, false)
+          }, 4000)
+        }
       })
 
       channel.bind('typing:stop', ({ conversationId, userId }) => {
-        setTyping(conversationId, userId, false)
+        const stopUserId = (userId?._id || userId)?.toString()
+        if (stopUserId) {
+          clearTimeout(typingTimeoutsRef.current[`${conversationId}_${stopUserId}`])
+          setTyping(conversationId, stopUserId, false)
+        }
       })
     }
 
     return () => {
       unsubscribeChannel(channelName)
     }
-  }, [activeConversation?._id])
+  }, [activeConversation?._id, user?._id])
 
   return (
     <div
@@ -203,18 +297,7 @@ export const MainLayout = () => {
 
       {/* Edit Profile Panel */}
       {activePanel === 'editProfile' && (
-        <div
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: isMobile ? 0 : 'var(--sidebar-width)',
-            width: isMobile ? '100%' : 'auto',
-            height: '100%',
-            zIndex: 100,
-          }}
-        >
-          <EditProfilePanel onClose={() => setActivePanel(null)} />
-        </div>
+        <EditProfilePanel onClose={() => setActivePanel(null)} />
       )}
 
       {/* Modals */}

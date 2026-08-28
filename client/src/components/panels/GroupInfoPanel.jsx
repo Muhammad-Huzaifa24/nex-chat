@@ -36,10 +36,9 @@ export const GroupInfoPanel = ({ conversation, currentUserId, onClose }) => {
   }
 
   const handleLeaveGroup = async () => {
-    if (!window.confirm('Are you sure you want to leave this group?')) return
     try {
       await api.post(`/conversations/group/${conversation._id}/leave`)
-      addToast('Left group', 'info')
+      addToast('You left the group', 'info')
       setActiveConversation(null)
       fetchConversations()
       onClose()
@@ -48,12 +47,11 @@ export const GroupInfoPanel = ({ conversation, currentUserId, onClose }) => {
     }
   }
 
-  const handleRemoveMember = async (memberId) => {
-    if (!window.confirm('Remove this member from the group?')) return
+  const handleRemoveMember = async (memberId, memberName = 'Member') => {
     try {
       const res = await api.delete(`/conversations/group/${conversation._id}/members/${memberId}`)
       addOrUpdateConversation(res.data.conversation)
-      addToast('Member removed', 'info')
+      addToast(`${memberName} removed from group`, 'info')
     } catch (err) {
       addToast('Failed to remove member', 'error')
     }
@@ -199,9 +197,9 @@ export const GroupInfoPanel = ({ conversation, currentUserId, onClose }) => {
                     )}
                     {isAdmin && !isSelf && (
                       <button
-                        onClick={() => handleRemoveMember(pId)}
+                        onClick={() => handleRemoveMember(pId, participant.displayName || participant.username)}
                         className="btn-icon"
-                        style={{ width: 24, height: 24 }}
+                        style={{ width: 28, height: 28 }}
                         title="Remove member"
                       >
                         <Trash2 size={14} color="var(--accent-red)" />

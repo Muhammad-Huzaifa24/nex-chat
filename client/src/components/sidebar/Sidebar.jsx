@@ -207,9 +207,12 @@ export const Sidebar = ({ onOpenNewChat, onOpenNewGroup }) => {
           </div>
         ) : (
           filteredConversations.map((conv) => {
-            const typingMap = typingUsers[conv._id] || {}
-            const isTyping = Object.keys(typingMap).length > 0
-            const typingText = Object.values(typingMap).join(', ') + ' typing...'
+            const rawTyping = typingUsers[conv._id] || {}
+            const typingEntries = Object.entries(rawTyping).filter(
+              ([id]) => id.toString() !== user?._id?.toString()
+            )
+            const isTyping = typingEntries.length > 0
+            const typingText = typingEntries.map(([, name]) => name).join(', ') + ' typing...'
 
             return (
               <ConversationItem

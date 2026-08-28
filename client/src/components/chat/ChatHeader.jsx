@@ -20,15 +20,19 @@ export const ChatHeader = ({
   const avatarSrc = conversation.isGroup ? conversation.groupAvatar : otherParticipant?.avatar
   const isOnline = !conversation.isGroup && otherParticipant?.isOnline
 
-  // Subtitle / status line
-  const typingMap = typingUsers[conversation._id] || {}
-  const isTyping = Object.keys(typingMap).length > 0
+  // Subtitle / status line (filtered to ensure current user is never shown as typing to themselves)
+  const rawTyping = typingUsers[conversation._id] || {}
+  const typingEntries = Object.entries(rawTyping).filter(
+    ([id]) => id.toString() !== currentUserId?.toString()
+  )
+  const isTyping = typingEntries.length > 0
 
   const getSubtitle = () => {
     if (isTyping) {
+      const names = typingEntries.map(([, name]) => name).join(', ')
       return (
         <span style={{ color: 'var(--primary-color)', fontWeight: 500 }}>
-          {Object.values(typingMap).join(', ')} typing...
+          {names} typing...
         </span>
       )
     }

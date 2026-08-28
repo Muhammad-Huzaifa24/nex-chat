@@ -57,7 +57,17 @@ export const EditProfilePanel = ({ onClose }) => {
   return (
     <>
       <div className="drawer-backdrop" onClick={onClose} />
-      <div className="side-panel" style={{ left: 'var(--sidebar-width)', right: 'auto' }}>
+      <div
+        className="side-panel"
+        style={{
+          left: 0,
+          right: 'auto',
+          borderRight: '1px solid var(--border-color)',
+          borderLeft: 'none',
+          boxShadow: '8px 0 32px rgba(0, 0, 0, 0.25)',
+          animation: 'slideRight 0.24s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+        }}
+      >
       {/* Header */}
       <div
         style={{

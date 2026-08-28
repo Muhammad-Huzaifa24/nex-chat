@@ -277,6 +277,7 @@ export const markMessagesAsRead = async (req, res) => {
     triggerPusherEvent(`conversation-${conversationId}`, 'message:status_update', {
       conversationId,
       status: 'read',
+      readBy: userId,
     })
 
     res.status(200).json({ success: true, message: 'Messages marked as read' })

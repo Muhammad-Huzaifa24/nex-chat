@@ -60,6 +60,25 @@ export const useConversationStore = create((set, get) => ({
     })
   },
 
+  updateLastMessageStatus: (conversationId, status, readBy = null) => {
+    set((state) => {
+      const updated = state.conversations.map((c) => {
+        if (c._id === conversationId && c.lastMessage) {
+          if (readBy) {
+            const senderId = (c.lastMessage.senderId?._id || c.lastMessage.senderId)?.toString()
+            if (senderId && senderId !== readBy.toString()) {
+              return { ...c, lastMessage: { ...c.lastMessage, status } }
+            }
+            return c
+          }
+          return { ...c, lastMessage: { ...c.lastMessage, status } }
+        }
+        return c
+      })
+      return { conversations: updated }
+    })
+  },
+
   setUserOnline: (userId, isOnline) => {
     set((state) => {
       const online = new Set(state.onlineUsers)
@@ -94,10 +113,13 @@ export const useConversationStore = create((set, get) => ({
   setTyping: (conversationId, user, isTyping) => {
     set((state) => {
       const current = { ...(state.typingUsers[conversationId] || {}) }
+      const uId = (typeof user === 'object' && user ? user._id : user)?.toString()
+      if (!uId) return state
+
       if (isTyping) {
-        current[user._id] = user.displayName || user.username
+        current[uId] = typeof user === 'object' && user ? (user.displayName || user.username) : 'Someone'
       } else {
-        delete current[user._id || user]
+        delete current[uId]
       }
       return {
         typingUsers: {
