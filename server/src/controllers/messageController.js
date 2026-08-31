@@ -151,6 +151,15 @@ export const sendMessage = async (req, res) => {
       conversationId,
     })
 
+    // Bridge to Socket.IO if instance exists
+    const io = req.app?.get('io')
+    if (io) {
+      io.to(conversationId).emit('message:new', {
+        message: populated,
+        conversationId,
+      })
+    }
+
     // Send email notification to offline participants (async non-blocking)
     Conversation.findById(conversationId)
       .populate('participants', 'username displayName email isOnline lastNotifiedAt')
@@ -195,11 +204,29 @@ export const deleteMessage = async (req, res) => {
       message.attachmentMeta = {}
       await message.save()
 
-      triggerPusherEvent(`conversation-${message.conversationId}`, 'message:deleted', {
+      const channels = [`conversation-${message.conversationId}`]
+      const conversation = await Conversation.findById(message.conversationId)
+      if (conversation?.participants && Array.isArray(conversation.participants)) {
+        conversation.participants.forEach((p) => {
+          channels.push(`user-${p.toString()}`)
+        })
+      }
+
+      triggerPusherEvent(channels, 'message:deleted', {
         messageId: id,
         conversationId: message.conversationId,
         deleteFor: 'everyone',
       })
+
+      // Bridge to Socket.IO if instance exists
+      const io = req.app?.get('io')
+      if (io) {
+        io.to(message.conversationId.toString()).emit('message:deleted', {
+          messageId: id,
+          conversationId: message.conversationId,
+          deleteFor: 'everyone',
+        })
+      }
     } else {
       if (!message.deletedFor.includes(userId)) {
         message.deletedFor.push(userId)
@@ -243,14 +270,31 @@ export const reactToMessage = async (req, res) => {
 
     // Populate userId in reactions so client gets full user data
     const populated = await Message.findById(id).populate('reactions.userId', '_id displayName username avatar')
-
     const populatedReactions = populated.reactions
 
-    triggerPusherEvent(`conversation-${message.conversationId}`, 'message:reaction_update', {
+    const channels = [`conversation-${message.conversationId}`]
+    const conversation = await Conversation.findById(message.conversationId)
+    if (conversation?.participants && Array.isArray(conversation.participants)) {
+      conversation.participants.forEach((p) => {
+        channels.push(`user-${p.toString()}`)
+      })
+    }
+
+    triggerPusherEvent(channels, 'message:reaction_update', {
       messageId: id,
       reactions: populatedReactions,
       conversationId: message.conversationId,
     })
+
+    // Bridge to Socket.IO if instance exists
+    const io = req.app?.get('io')
+    if (io) {
+      io.to(message.conversationId.toString()).emit('message:reaction_update', {
+        messageId: id,
+        reactions: populatedReactions,
+        conversationId: message.conversationId,
+      })
+    }
 
     res.status(200).json({ success: true, reactions: populatedReactions })
   } catch (error) {
@@ -274,11 +318,29 @@ export const markMessagesAsRead = async (req, res) => {
       { status: 'read' }
     )
 
-    triggerPusherEvent(`conversation-${conversationId}`, 'message:status_update', {
+    const channels = [`conversation-${conversationId}`]
+    const conversation = await Conversation.findById(conversationId)
+    if (conversation?.participants && Array.isArray(conversation.participants)) {
+      conversation.participants.forEach((p) => {
+        channels.push(`user-${p.toString()}`)
+      })
+    }
+
+    triggerPusherEvent(channels, 'message:status_update', {
       conversationId,
       status: 'read',
       readBy: userId,
     })
+
+    // Bridge to Socket.IO if instance exists
+    const io = req.app?.get('io')
+    if (io) {
+      io.to(conversationId).emit('message:status_update', {
+        conversationId,
+        status: 'read',
+        readBy: userId,
+      })
+    }
 
     res.status(200).json({ success: true, message: 'Messages marked as read' })
   } catch (error) {

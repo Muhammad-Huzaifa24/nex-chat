@@ -79,26 +79,34 @@ export const useConversationStore = create((set, get) => ({
     })
   },
 
-  setUserOnline: (userId, isOnline) => {
+  setUserOnline: (userId, isOnline, lastSeen = null) => {
     set((state) => {
       const online = new Set(state.onlineUsers)
       if (isOnline) {
-        online.add(userId)
+        online.add(userId.toString())
       } else {
-        online.delete(userId)
+        online.delete(userId.toString())
       }
 
       // Update in conversation participants
       const updatedConversations = state.conversations.map((c) => ({
         ...c,
-        participants: c.participants.map((p) => (p._id === userId ? { ...p, isOnline } : p)),
+        participants: c.participants.map((p) =>
+          p._id?.toString() === userId.toString()
+            ? { ...p, isOnline, ...(lastSeen ? { lastSeen } : {}) }
+            : p
+        ),
       }))
 
       let updatedActive = state.activeConversation
       if (updatedActive) {
         updatedActive = {
           ...updatedActive,
-          participants: updatedActive.participants.map((p) => (p._id === userId ? { ...p, isOnline } : p)),
+          participants: updatedActive.participants.map((p) =>
+            p._id?.toString() === userId.toString()
+              ? { ...p, isOnline, ...(lastSeen ? { lastSeen } : {}) }
+              : p
+          ),
         }
       }
 

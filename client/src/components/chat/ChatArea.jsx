@@ -158,22 +158,44 @@ export const ChatArea = ({ onBack, onImageClick }) => {
     }
   }
 
+  const typingTimeoutRef = React.useRef(null)
+  const lastTypingSentRef = React.useRef(0)
+
   const handleTypingStart = () => {
-    if (activeConversation) {
-      if (socket) {
-        socket.emit('typing:start', { conversationId: activeConversation._id })
-      }
+    if (!activeConversation) return
+
+    // 1. Emit via socket.io immediately if connected (local dev / persistent servers)
+    if (socket && socket.connected) {
+      socket.emit('typing:start', { conversationId: activeConversation._id })
+    }
+
+    // 2. Throttle REST API typing status calls (production Vercel fallback) to max once every 3 seconds
+    const now = Date.now()
+    if (now - lastTypingSentRef.current > 3000) {
+      lastTypingSentRef.current = now
       api.post('/messages/typing', { conversationId: activeConversation._id, isTyping: true }).catch(() => {})
     }
+
+    // Manage client-side typing stop timeout
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
+    typingTimeoutRef.current = setTimeout(() => {
+      handleTypingStop()
+    }, 3000)
   }
 
   const handleTypingStop = () => {
-    if (activeConversation) {
-      if (socket) {
-        socket.emit('typing:stop', { conversationId: activeConversation._id })
-      }
-      api.post('/messages/typing', { conversationId: activeConversation._id, isTyping: false }).catch(() => {})
+    if (!activeConversation) return
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current)
+      typingTimeoutRef.current = null
     }
+
+    if (socket && socket.connected) {
+      socket.emit('typing:stop', { conversationId: activeConversation._id })
+    }
+    
+    api.post('/messages/typing', { conversationId: activeConversation._id, isTyping: false }).catch(() => {})
+    lastTypingSentRef.current = 0
   }
 
   const handleReact = async (messageId, emoji) => {

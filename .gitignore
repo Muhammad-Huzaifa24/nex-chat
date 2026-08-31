@@ -52,3 +52,6 @@ desktop.ini
 .cache/
 coverage/
 .nyc_output/
+
+#plan files
+plan.md

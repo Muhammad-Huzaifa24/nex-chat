@@ -7,7 +7,7 @@ const subscribedChannels = new Map()
  * Get or create the Pusher client instance
  */
 export const getPusher = () => {
-  const pusherKey = import.meta.env.VITE_PUSHER_KEY
+  const pusherKey = import.meta.env.VITE_PUSHER_KEY || 'a759918090cc2df320d1'
   const pusherCluster = import.meta.env.VITE_PUSHER_CLUSTER || 'ap2'
 
   if (!pusherKey) {
@@ -15,9 +15,15 @@ export const getPusher = () => {
   }
 
   if (!pusherClient) {
+    console.log(`[Pusher Client] Initializing connection with cluster '${pusherCluster}' and key '${pusherKey.substring(0, 6)}...'`)
     pusherClient = new Pusher(pusherKey, {
       cluster: pusherCluster,
       forceTLS: true,
+    })
+
+    pusherClient.connection.bind('state_change', (states) => {
+      // states = { previous: '...', current: '...' }
+      console.log(`[Pusher Client Connection State] changed from ${states.previous} to ${states.current}`)
     })
 
     pusherClient.connection.bind('connected', () => {
@@ -25,7 +31,7 @@ export const getPusher = () => {
     })
 
     pusherClient.connection.bind('error', (err) => {
-      console.warn('[Pusher Client Error]', err)
+      console.warn('[Pusher Client Connection Error]', err)
     })
   }
 

@@ -93,6 +93,15 @@ export const login = async (req, res) => {
     user.isOnline = true
     await user.save()
 
+    // Realtime presence broadcast
+    import('../config/pusher.js').then(({ triggerPusherEvent }) => {
+      triggerPusherEvent(['global-presence', `user-${user._id}`], 'user:status', {
+        userId: user._id,
+        isOnline: true,
+        lastSeen: new Date(),
+      })
+    })
+
     const token = generateToken(user._id)
     res.cookie('token', token, cookieOptions)
 
@@ -112,9 +121,19 @@ export const login = async (req, res) => {
 export const logout = async (req, res) => {
   try {
     if (req.user) {
+      const now = new Date()
       await User.findByIdAndUpdate(req.user._id, {
         isOnline: false,
-        lastSeen: new Date(),
+        lastSeen: now,
+      })
+
+      // Realtime presence broadcast
+      import('../config/pusher.js').then(({ triggerPusherEvent }) => {
+        triggerPusherEvent(['global-presence', `user-${req.user._id}`], 'user:status', {
+          userId: req.user._id,
+          isOnline: false,
+          lastSeen: now,
+        })
       })
     }
     res.clearCookie('token', cookieOptions)

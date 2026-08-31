@@ -12,6 +12,7 @@ import { useConversationStore } from '../../store/conversationStore'
 import { useMessageStore } from '../../store/messageStore'
 import { getSocket } from '../../socket/socket'
 import { subscribeChannel, unsubscribeChannel } from '../../socket/pusher'
+import api from '../../services/api'
 
 export const MainLayout = () => {
   const { user, token } = useAuthStore()
@@ -164,6 +165,7 @@ export const MainLayout = () => {
 
       if (userChannel) {
         userChannel.bind('message:new', ({ message, conversationId }) => {
+          console.log('[Pusher Debug] userChannel message:new received:', { messageId: message._id, conversationId })
           addMessage(conversationId, message)
           updateLastMessage(conversationId, message)
 
@@ -174,10 +176,66 @@ export const MainLayout = () => {
             triggerPushNotification(senderName, previewText, message.senderId?.avatar)
           }
         })
+
+        userChannel.bind('message:status_update', ({ conversationId, status, readBy }) => {
+          console.log('[Pusher Debug] userChannel message:status_update received:', { conversationId, status, readBy })
+          updateMessageStatus(conversationId, status, readBy)
+          updateLastMessageStatus(conversationId, status, readBy)
+        })
+
+        userChannel.bind('message:reaction_update', ({ messageId, reactions, conversationId }) => {
+          console.log('[Pusher Debug] userChannel message:reaction_update received:', { messageId, reactionsCount: reactions?.length, conversationId })
+          updateReaction(conversationId, messageId, reactions)
+        })
+
+        userChannel.bind('message:deleted', ({ messageId, conversationId, deleteFor }) => {
+          console.log('[Pusher Debug] userChannel message:deleted received:', { messageId, conversationId, deleteFor })
+          deleteMessageLocal(conversationId, messageId, deleteFor)
+        })
       }
 
+      // 3. Global Presence Subscription
+      const presenceChannel = subscribeChannel('global-presence')
+      if (presenceChannel) {
+        presenceChannel.bind('user:status', ({ userId, isOnline, lastSeen }) => {
+          console.log('[Pusher Debug] global-presence user:status received:', { userId, isOnline, lastSeen })
+          if (userId && userId.toString() !== user?._id?.toString()) {
+            setUserOnline(userId, isOnline, lastSeen)
+          }
+        })
+      }
+
+      // 4. Heartbeat (every 30s) & Offline Beacon
+      const sendHeartbeat = () => {
+        if (document.visibilityState === 'visible') {
+          api.post('/users/heartbeat').catch(() => {})
+        }
+      }
+
+      sendHeartbeat()
+      const heartbeatInterval = setInterval(sendHeartbeat, 30000)
+
+      const handleVisibilityChange = () => {
+        if (document.visibilityState === 'visible') {
+          sendHeartbeat()
+        }
+      }
+      document.addEventListener('visibilitychange', handleVisibilityChange)
+
+      const handleBeforeUnload = () => {
+        const url = `${import.meta.env.VITE_API_URL || '/api'}/users/offline`
+        if (navigator.sendBeacon) {
+          navigator.sendBeacon(url)
+        }
+      }
+      window.addEventListener('beforeunload', handleBeforeUnload)
+
       return () => {
+        clearInterval(heartbeatInterval)
+        document.removeEventListener('visibilitychange', handleVisibilityChange)
+        window.removeEventListener('beforeunload', handleBeforeUnload)
         unsubscribeChannel(userChannelName)
+        unsubscribeChannel('global-presence')
       }
     }
   }, [token, user?._id])

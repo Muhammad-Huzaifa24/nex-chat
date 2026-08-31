@@ -11,11 +11,20 @@ const api = axios.create({
   },
 })
 
-// Intercept requests to trigger global loader (skip silent background calls like typing)
+const isSilentRequest = (url) => {
+  if (!url) return false
+  return (
+    url.includes('/typing') ||
+    url.includes('/heartbeat') ||
+    url.includes('/offline') ||
+    url.includes('/read')
+  )
+}
+
+// Intercept requests to trigger global loader (skip silent background calls)
 api.interceptors.request.use(
   (config) => {
-    // Check if request is silent
-    if (!config.url?.includes('/typing')) {
+    if (!isSilentRequest(config.url)) {
       useLoaderStore.getState().startLoading()
     }
     return config
@@ -29,13 +38,13 @@ api.interceptors.request.use(
 // Intercept responses to stop loader & handle errors
 api.interceptors.response.use(
   (response) => {
-    if (!response.config?.url?.includes('/typing')) {
+    if (!isSilentRequest(response.config?.url)) {
       useLoaderStore.getState().stopLoading()
     }
     return response
   },
   (error) => {
-    if (!error.config?.url?.includes('/typing')) {
+    if (!isSilentRequest(error.config?.url)) {
       useLoaderStore.getState().stopLoading()
     }
     if (error.response && error.response.status === 401) {

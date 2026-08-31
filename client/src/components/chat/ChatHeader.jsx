@@ -27,6 +27,39 @@ export const ChatHeader = ({
   )
   const isTyping = typingEntries.length > 0
 
+  const formatLastSeen = (dateString) => {
+    if (!dateString) return 'offline'
+    const date = new Date(dateString)
+    if (isNaN(date.getTime())) return 'offline'
+
+    const now = new Date()
+    const diffMs = now - date
+    const diffMins = Math.floor(diffMs / (1000 * 60))
+    if (diffMins < 1) return 'last seen just now'
+
+    const isToday =
+      date.getDate() === now.getDate() &&
+      date.getMonth() === now.getMonth() &&
+      date.getFullYear() === now.getFullYear()
+
+    const yesterday = new Date(now)
+    yesterday.setDate(yesterday.getDate() - 1)
+    const isYesterday =
+      date.getDate() === yesterday.getDate() &&
+      date.getMonth() === yesterday.getMonth() &&
+      date.getFullYear() === yesterday.getFullYear()
+
+    const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+
+    if (isToday) {
+      return `last seen today at ${timeStr}`
+    } else if (isYesterday) {
+      return `last seen yesterday at ${timeStr}`
+    } else {
+      return `last seen ${date.toLocaleDateString([], { month: 'short', day: 'numeric' })} at ${timeStr}`
+    }
+  }
+
   const getSubtitle = () => {
     if (isTyping) {
       const names = typingEntries.map(([, name]) => name).join(', ')
@@ -47,8 +80,7 @@ export const ChatHeader = ({
     }
 
     if (otherParticipant?.lastSeen) {
-      const lastSeenDate = new Date(otherParticipant.lastSeen)
-      return `last seen ${lastSeenDate.toLocaleDateString()} at ${lastSeenDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+      return formatLastSeen(otherParticipant.lastSeen)
     }
 
     return 'offline'

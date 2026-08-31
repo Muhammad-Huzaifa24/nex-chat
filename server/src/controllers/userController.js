@@ -72,3 +72,55 @@ export const updateAvatar = async (req, res) => {
     res.status(500).json({ success: false, message: error.message })
   }
 }
+
+// @desc    Heartbeat to keep user presence alive
+// @route   POST /api/users/heartbeat
+export const heartbeat = async (req, res) => {
+  try {
+    const userId = req.user._id
+    const now = new Date()
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { isOnline: true, lastSeen: now },
+      { new: true }
+    ).select('isOnline lastSeen')
+
+    // Broadcast status to global-presence and personal user channel
+    import('../config/pusher.js').then(({ triggerPusherEvent }) => {
+      triggerPusherEvent(['global-presence', `user-${userId}`], 'user:status', {
+        userId,
+        isOnline: true,
+        lastSeen: now,
+      })
+    })
+
+    res.status(200).json({ success: true, isOnline: true, lastSeen: now })
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message })
+  }
+}
+
+// @desc    Mark user as offline (Beacon / tab disconnect)
+// @route   POST /api/users/offline
+export const setOffline = async (req, res) => {
+  try {
+    const userId = req.user._id
+    const now = new Date()
+
+    await User.findByIdAndUpdate(userId, { isOnline: false, lastSeen: now })
+
+    // Broadcast status to global-presence and personal user channel
+    import('../config/pusher.js').then(({ triggerPusherEvent }) => {
+      triggerPusherEvent(['global-presence', `user-${userId}`], 'user:status', {
+        userId,
+        isOnline: false,
+        lastSeen: now,
+      })
+    })
+
+    res.status(200).json({ success: true, isOnline: false, lastSeen: now })
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message })
+  }
+}
