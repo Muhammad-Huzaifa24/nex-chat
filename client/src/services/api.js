@@ -17,7 +17,9 @@ const isSilentRequest = (url) => {
     url.includes('/typing') ||
     url.includes('/heartbeat') ||
     url.includes('/offline') ||
-    url.includes('/read')
+    url.includes('/read') ||
+    url.includes('/deliver') ||
+    url.includes('/messages')
   )
 }
 

@@ -370,3 +370,54 @@ export const sendTypingStatus = async (req, res) => {
     res.status(500).json({ success: false, message: error.message })
   }
 }
+
+// @desc    Mark a message as delivered
+// @route   PUT /api/messages/deliver/:messageId
+export const markMessageAsDelivered = async (req, res) => {
+  try {
+    const { messageId } = req.params
+    const userId = req.user._id
+
+    const message = await Message.findById(messageId)
+    if (!message) {
+      return res.status(404).json({ success: false, message: 'Message not found' })
+    }
+
+    // Only update if currently sent. Do not overwrite read status.
+    if (message.status === 'sent') {
+      message.status = 'delivered'
+      await message.save()
+
+      const conversationId = message.conversationId.toString()
+      const channels = [`conversation-${conversationId}`]
+      const conversation = await Conversation.findById(conversationId)
+      if (conversation?.participants && Array.isArray(conversation.participants)) {
+        conversation.participants.forEach((p) => {
+          channels.push(`user-${p.toString()}`)
+        })
+      }
+
+      // Trigger status update to double ticks
+      triggerPusherEvent(channels, 'message:status_update', {
+        conversationId,
+        messageId,
+        status: 'delivered',
+        readBy: userId,
+      })
+
+      const io = req.app?.get('io')
+      if (io) {
+        io.to(conversationId).emit('message:status_update', {
+          conversationId,
+          messageId,
+          status: 'delivered',
+          readBy: userId,
+        })
+      }
+    }
+
+    res.status(200).json({ success: true, message: 'Message marked as delivered' })
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message })
+  }
+}

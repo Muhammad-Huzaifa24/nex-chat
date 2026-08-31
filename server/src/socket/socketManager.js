@@ -3,6 +3,7 @@ import { verifyToken } from '../utils/jwt.js'
 import User from '../models/User.js'
 import Conversation from '../models/Conversation.js'
 import Message from '../models/Message.js'
+import { triggerPusherEvent } from '../config/pusher.js'
 
 export const initializeSocket = (httpServer) => {
   const io = new Server(httpServer, {
@@ -58,8 +59,58 @@ export const initializeSocket = (httpServer) => {
       userConversations.forEach((conv) => {
         socket.join(conv._id.toString())
       })
+
+      // Catch-up: Mark pending 'sent' messages from other users as 'delivered' in bulk
+      const conversationIds = userConversations.map((conv) => conv._id)
+      const pendingMessages = await Message.find({
+        conversationId: { $in: conversationIds },
+        senderId: { $ne: userId },
+        status: 'sent'
+      }).select('_id conversationId')
+
+      if (pendingMessages.length > 0) {
+        await Message.updateMany(
+          { _id: { $in: pendingMessages.map((m) => m._id) } },
+          { status: 'delivered' }
+        )
+
+        // Group by conversation to trigger events
+        const conversationGroup = {}
+        pendingMessages.forEach((msg) => {
+          const cId = msg.conversationId.toString()
+          if (!conversationGroup[cId]) {
+            conversationGroup[cId] = []
+          }
+          conversationGroup[cId].push(msg._id.toString())
+        })
+
+        // Broadcast status updates
+        for (const [cId, msgIds] of Object.entries(conversationGroup)) {
+          const channels = [`conversation-${cId}`]
+          const conversation = await Conversation.findById(cId)
+          if (conversation?.participants) {
+            conversation.participants.forEach((p) => {
+              channels.push(`user-${p.toString()}`)
+            })
+          }
+
+          // Trigger Pusher
+          triggerPusherEvent(channels, 'message:status_update', {
+            conversationId: cId,
+            status: 'delivered',
+            readBy: userId,
+          })
+
+          // Trigger Socket.io
+          io.to(cId).emit('message:status_update', {
+            conversationId: cId,
+            status: 'delivered',
+            readBy: userId,
+          })
+        }
+      }
     } catch (err) {
-      console.error('[Socket Room Join Error]', err)
+      console.error('[Socket Room Join/Catch-Up Error]', err)
     }
 
     // Join specific conversation room (e.g. newly created)

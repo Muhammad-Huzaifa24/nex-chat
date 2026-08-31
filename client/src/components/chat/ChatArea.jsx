@@ -35,6 +35,8 @@ export const ChatArea = ({ onBack, onImageClick }) => {
   } = useMessageStore()
 
   const [deleteTargetMessage, setDeleteTargetMessage] = useState(null)
+  const typingTimeoutRef = React.useRef(null)
+  const lastTypingSentRef = React.useRef(0)
 
   const socket = getSocket(token)
   const currentMessages = activeConversation ? messages[activeConversation._id] || [] : []
@@ -157,9 +159,6 @@ export const ChatArea = ({ onBack, onImageClick }) => {
       })
     }
   }
-
-  const typingTimeoutRef = React.useRef(null)
-  const lastTypingSentRef = React.useRef(0)
 
   const handleTypingStart = () => {
     if (!activeConversation) return

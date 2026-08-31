@@ -4,63 +4,77 @@ import { useLoaderStore } from '../../store/loaderStore'
 export const GlobalLoader = () => {
   const activeRequests = useLoaderStore((state) => state.activeRequests)
   const isLoading = activeRequests > 0
-  const [progress, setProgress] = useState(0)
   const [visible, setVisible] = useState(false)
 
   useEffect(() => {
-    let interval = null
-
     if (isLoading) {
       setVisible(true)
-      setProgress((prev) => (prev === 0 ? 25 : prev))
-
-      interval = setInterval(() => {
-        setProgress((prev) => {
-          if (prev >= 88) return prev
-          return prev + Math.random() * 12
-        })
-      }, 200)
     } else {
-      // Completed
-      setProgress(100)
       const timeout = setTimeout(() => {
         setVisible(false)
-        setProgress(0)
-      }, 350)
+      }, 200)
       return () => clearTimeout(timeout)
-    }
-
-    return () => {
-      if (interval) clearInterval(interval)
     }
   }, [isLoading])
 
   if (!visible) return null
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        height: '3px',
-        zIndex: 99999,
-        pointerEvents: 'none',
-        overflow: 'hidden',
-      }}
-    >
+    <>
+      <style>{`
+        @keyframes whatsapp-spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}</style>
       <div
         style={{
-          height: '100%',
-          width: `${progress}%`,
-          backgroundColor: 'var(--primary-color)',
-          boxShadow: '0 0 10px var(--primary-color), 0 0 5px var(--primary-color)',
-          transition: progress === 100 ? 'width 0.2s ease-out, opacity 0.3s ease' : 'width 0.3s ease-out',
-          opacity: progress === 100 ? 0 : 1,
-          borderRadius: '0 2px 2px 0',
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.4)',
+          backdropFilter: 'blur(3px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 99999,
+          pointerEvents: 'auto',
+          transition: 'opacity 0.2s ease',
         }}
-      />
-    </div>
+      >
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 16,
+            padding: '24px 36px',
+            borderRadius: '16px',
+            backgroundColor: 'var(--bg-surface)',
+            boxShadow: 'var(--shadow-lg)',
+            border: '1px solid var(--border-color)',
+          }}
+        >
+          <div
+            style={{
+              width: '40px',
+              height: '40px',
+              border: '3.5px solid var(--border-subtle)',
+              borderTopColor: 'var(--primary-color)',
+              borderRadius: '50%',
+              animation: 'whatsapp-spin 0.95s linear infinite',
+            }}
+          />
+          <span
+            style={{
+              fontSize: 'var(--font-size-sm)',
+              fontWeight: 500,
+              color: 'var(--text-secondary)',
+            }}
+          >
+            Connecting...
+          </span>
+        </div>
+      </div>
+    </>
   )
 }

@@ -108,11 +108,15 @@ export const MainLayout = () => {
         const senderId = (message.senderId?._id || message.senderId)?.toString()
         const isFromOtherUser = senderId && senderId !== user?._id?.toString()
 
-        // Auto-mark as read if this message is for the currently open conversation
+        // Auto-mark as read or delivered based on viewport focus status
         if (isFromOtherUser) {
           const currentActiveId = useConversationStore.getState().activeConversation?._id
-          if (currentActiveId === conversationId) {
+          const isAppFocused = document.visibilityState === 'visible' && document.hasFocus()
+
+          if (currentActiveId === conversationId && isAppFocused) {
             api.put(`/messages/read/${conversationId}`).catch(() => {})
+          } else {
+            api.put(`/messages/deliver/${message._id}`).catch(() => {})
           }
           const senderName = message.senderId?.displayName || message.senderId?.username || 'New message'
           const previewText = message.content || (message.type === 'image' ? '📷 Photo' : '📎 Attachment')
@@ -179,11 +183,15 @@ export const MainLayout = () => {
           const senderId = (message.senderId?._id || message.senderId)?.toString()
           const isFromOtherUser = senderId && senderId !== user?._id?.toString()
 
-          // Auto-mark as read if this message is for the currently open conversation
+          // Auto-mark as read or delivered based on viewport focus status
           if (isFromOtherUser) {
             const currentActiveId = useConversationStore.getState().activeConversation?._id
-            if (currentActiveId === conversationId) {
+            const isAppFocused = document.visibilityState === 'visible' && document.hasFocus()
+
+            if (currentActiveId === conversationId && isAppFocused) {
               api.put(`/messages/read/${conversationId}`).catch(() => {})
+            } else {
+              api.put(`/messages/deliver/${message._id}`).catch(() => {})
             }
             const senderName = message.senderId?.displayName || message.senderId?.username || 'New message'
             const previewText = message.content || (message.type === 'image' ? '📷 Photo' : '📎 Attachment')
@@ -232,9 +240,23 @@ export const MainLayout = () => {
       const handleVisibilityChange = () => {
         if (document.visibilityState === 'visible') {
           sendHeartbeat()
+          
+          // Also mark messages as read when returning to focus on an active chat
+          const currentActiveId = useConversationStore.getState().activeConversation?._id
+          if (currentActiveId) {
+            api.put(`/messages/read/${currentActiveId}`).catch(() => {})
+          }
         }
       }
       document.addEventListener('visibilitychange', handleVisibilityChange)
+
+      const handleWindowFocus = () => {
+        const currentActiveId = useConversationStore.getState().activeConversation?._id
+        if (currentActiveId) {
+          api.put(`/messages/read/${currentActiveId}`).catch(() => {})
+        }
+      }
+      window.addEventListener('focus', handleWindowFocus)
 
       const handleBeforeUnload = () => {
         const url = `${import.meta.env.VITE_API_URL || '/api'}/users/offline`
@@ -247,6 +269,7 @@ export const MainLayout = () => {
       return () => {
         clearInterval(heartbeatInterval)
         document.removeEventListener('visibilitychange', handleVisibilityChange)
+        window.removeEventListener('focus', handleWindowFocus)
         window.removeEventListener('beforeunload', handleBeforeUnload)
         unsubscribeChannel(userChannelName)
         unsubscribeChannel('global-presence')
@@ -269,11 +292,15 @@ export const MainLayout = () => {
         const senderId = (message.senderId?._id || message.senderId)?.toString()
         const isFromOtherUser = senderId && senderId !== user?._id?.toString()
 
-        // Auto-mark as read if this message is for the currently open conversation
+        // Auto-mark as read or delivered based on viewport focus status
         if (isFromOtherUser) {
           const currentActiveId = useConversationStore.getState().activeConversation?._id
-          if (currentActiveId === conversationId) {
+          const isAppFocused = document.visibilityState === 'visible' && document.hasFocus()
+
+          if (currentActiveId === conversationId && isAppFocused) {
             api.put(`/messages/read/${conversationId}`).catch(() => {})
+          } else {
+            api.put(`/messages/deliver/${message._id}`).catch(() => {})
           }
           const senderName = message.senderId?.displayName || message.senderId?.username || 'New message'
           const previewText = message.content || (message.type === 'image' ? '📷 Photo' : '📎 Attachment')

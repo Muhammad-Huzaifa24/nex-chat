@@ -64,16 +64,45 @@ export const MessageList = ({
   let lastDate = ''
 
   return (
-    <div
-      style={{
-        flex: 1,
-        overflowY: 'auto',
-        padding: '16px 0',
-        display: 'flex',
-        flexDirection: 'column',
-      }}
-    >
-      {messages.length === 0 && !isLoading && (
+    <>
+      <style>{`
+        @keyframes message-spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}</style>
+      <div
+        style={{
+          flex: 1,
+          overflowY: 'auto',
+          padding: '16px 0',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
+        {isLoading && (
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              padding: '12px 0',
+              width: '100%',
+            }}
+          >
+            <div
+              style={{
+                width: '20px',
+                height: '20px',
+                border: '2px dashed var(--border-subtle)',
+                borderTop: '2px solid var(--primary-color)',
+                borderRadius: '50%',
+                animation: 'message-spin 0.75s linear infinite',
+              }}
+            />
+          </div>
+        )}
+        {messages.length === 0 && !isLoading && (
         <div
           style={{
             display: 'flex',
@@ -112,5 +141,6 @@ export const MessageList = ({
 
       <div ref={bottomRef} />
     </div>
+    </>
   )
 }
