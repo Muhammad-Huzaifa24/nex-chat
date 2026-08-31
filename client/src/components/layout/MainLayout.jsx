@@ -106,7 +106,14 @@ export const MainLayout = () => {
         updateLastMessage(conversationId, message)
 
         const senderId = (message.senderId?._id || message.senderId)?.toString()
-        if (senderId && senderId !== user?._id?.toString()) {
+        const isFromOtherUser = senderId && senderId !== user?._id?.toString()
+
+        // Auto-mark as read if this message is for the currently open conversation
+        if (isFromOtherUser) {
+          const currentActiveId = useConversationStore.getState().activeConversation?._id
+          if (currentActiveId === conversationId) {
+            api.put(`/messages/read/${conversationId}`).catch(() => {})
+          }
           const senderName = message.senderId?.displayName || message.senderId?.username || 'New message'
           const previewText = message.content || (message.type === 'image' ? '📷 Photo' : '📎 Attachment')
           triggerPushNotification(senderName, previewText, message.senderId?.avatar)
@@ -170,7 +177,14 @@ export const MainLayout = () => {
           updateLastMessage(conversationId, message)
 
           const senderId = (message.senderId?._id || message.senderId)?.toString()
-          if (senderId && senderId !== user?._id?.toString()) {
+          const isFromOtherUser = senderId && senderId !== user?._id?.toString()
+
+          // Auto-mark as read if this message is for the currently open conversation
+          if (isFromOtherUser) {
+            const currentActiveId = useConversationStore.getState().activeConversation?._id
+            if (currentActiveId === conversationId) {
+              api.put(`/messages/read/${conversationId}`).catch(() => {})
+            }
             const senderName = message.senderId?.displayName || message.senderId?.username || 'New message'
             const previewText = message.content || (message.type === 'image' ? '📷 Photo' : '📎 Attachment')
             triggerPushNotification(senderName, previewText, message.senderId?.avatar)
@@ -253,7 +267,14 @@ export const MainLayout = () => {
         updateLastMessage(conversationId, message)
 
         const senderId = (message.senderId?._id || message.senderId)?.toString()
-        if (senderId && senderId !== user?._id?.toString()) {
+        const isFromOtherUser = senderId && senderId !== user?._id?.toString()
+
+        // Auto-mark as read if this message is for the currently open conversation
+        if (isFromOtherUser) {
+          const currentActiveId = useConversationStore.getState().activeConversation?._id
+          if (currentActiveId === conversationId) {
+            api.put(`/messages/read/${conversationId}`).catch(() => {})
+          }
           const senderName = message.senderId?.displayName || message.senderId?.username || 'New message'
           const previewText = message.content || (message.type === 'image' ? '📷 Photo' : '📎 Attachment')
           triggerPushNotification(senderName, previewText, message.senderId?.avatar)
