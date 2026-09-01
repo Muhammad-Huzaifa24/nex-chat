@@ -11,6 +11,45 @@
   overflow: hidden;
 }
 
+/* Auth Pages Responsive Layout */
+.auth-page-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100vw;
+  height: 100vh;
+  min-height: 100%;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  background-color: var(--bg-app);
+  padding: 32px 16px;
+  box-sizing: border-box;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 440px;
+  background-color: var(--bg-surface);
+  border-radius: var(--radius-xl);
+  padding: 32px 28px;
+  box-shadow: var(--shadow-xl);
+  border: 1px solid var(--border-color);
+  margin: auto;
+  box-sizing: border-box;
+}
+
+@media (max-width: 480px) {
+  .auth-page-container {
+    padding: 16px 12px;
+    align-items: flex-start;
+  }
+  .auth-card {
+    padding: 24px 18px;
+    border-radius: var(--radius-lg);
+  }
+}
+
+
 /* Common UI Utility Classes */
 .flex { display: flex; }
 .flex-col { display: flex; flex-direction: column; }

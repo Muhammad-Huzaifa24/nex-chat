@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Allow: /login
+Allow: /register
+Allow: /u/
+Allow: /chat/
+Disallow: /api/
+
+Sitemap: https://nex-chat-wjpg.vercel.app/sitemap.xml
