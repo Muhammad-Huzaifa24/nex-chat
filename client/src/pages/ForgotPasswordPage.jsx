@@ -194,29 +194,8 @@ export const ForgotPasswordPage = () => {
   const isOtpComplete = otp.every((d) => d !== '')
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        minHeight: '100vh',
-        width: '100vw',
-        backgroundColor: 'var(--bg-app)',
-        padding: '20px',
-      }}
-    >
-      <div
-        className="animate-slide-up"
-        style={{
-          width: '100%',
-          maxWidth: '440px',
-          backgroundColor: 'var(--bg-surface)',
-          borderRadius: 'var(--radius-xl)',
-          padding: '36px 32px',
-          boxShadow: 'var(--shadow-xl)',
-          border: '1px solid var(--border-color)',
-        }}
-      >
+    <div className="auth-page-container">
+      <div className="auth-card animate-slide-up" style={{ maxWidth: '440px' }}>
         {/* Header Icon & Title */}
         <div style={{ textAlign: 'center', marginBottom: '28px' }}>
           <div

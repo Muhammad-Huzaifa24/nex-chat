@@ -34,9 +34,11 @@ export const DirectChatRedirect = () => {
     const fetchProfile = async () => {
       try {
         setLoading(true)
+        document.title = `Chat with @${username} — NexChat`
         const res = await api.get(`/users/profile/${username}`)
         if (res.data.success && res.data.user) {
           setTargetUser(res.data.user)
+          document.title = `${res.data.user.displayName || res.data.user.username} on NexChat`
         } else {
           setError('User not found')
         }
@@ -48,6 +50,9 @@ export const DirectChatRedirect = () => {
     }
 
     fetchProfile()
+    return () => {
+      document.title = 'NexChat — Fast, Secure Real-Time Messaging'
+    }
   }, [username])
 
   // If already authenticated and not waiting for auth check, connect directly
@@ -120,28 +125,12 @@ export const DirectChatRedirect = () => {
 
   if (error || !targetUser) {
     return (
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          minHeight: '100vh',
-          width: '100vw',
-          backgroundColor: 'var(--bg-app)',
-          padding: '20px',
-        }}
-      >
+      <div className="auth-page-container">
         <div
-          className="animate-slide-up"
+          className="auth-card animate-slide-up"
           style={{
             maxWidth: '420px',
-            width: '100%',
-            backgroundColor: 'var(--bg-surface)',
-            borderRadius: 'var(--radius-xl)',
-            padding: '40px 32px',
             textAlign: 'center',
-            boxShadow: 'var(--shadow-xl)',
-            border: '1px solid var(--border-color)',
           }}
         >
           <div
@@ -178,27 +167,14 @@ export const DirectChatRedirect = () => {
   }
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        minHeight: '100vh',
-        width: '100vw',
-        backgroundColor: 'var(--bg-app)',
-        padding: '24px 16px',
-      }}
-    >
+    <div className="auth-page-container">
       <div
-        className="animate-slide-up"
+        className="auth-card animate-slide-up"
         style={{
           maxWidth: '440px',
-          width: '100%',
-          backgroundColor: 'var(--bg-surface)',
           borderRadius: '24px',
           padding: '36px 28px',
           boxShadow: '0 20px 40px -15px rgba(0, 0, 0, 0.4)',
-          border: '1px solid var(--border-color)',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
