@@ -12,9 +12,54 @@ export const FILE_LIMITS = {
   maxOverall: 50 * 1024 * 1024, // 50 MB overall multer threshold
 }
 
+// Whitelisted MIME types for secure uploads
+const ALLOWED_MIME_TYPES = new Set([
+  // Images
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'image/avif',
+  'image/heic',
+  'image/heif',
+  // Videos
+  'video/mp4',
+  'video/webm',
+  'video/quicktime',
+  'video/x-matroska',
+  'video/mpeg',
+  // Audio
+  'audio/mpeg',
+  'audio/mp3',
+  'audio/ogg',
+  'audio/wav',
+  'audio/webm',
+  'audio/mp4',
+  'audio/aac',
+  'audio/x-m4a',
+  // Documents & Archives
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'text/plain',
+  'text/csv',
+  'application/json',
+  'application/zip',
+  'application/x-zip-compressed',
+  'application/x-rar-compressed',
+  'application/x-7z-compressed',
+])
+
 const fileFilter = (req, file, cb) => {
-  // Allow all standard media & documents
-  cb(null, true)
+  if (ALLOWED_MIME_TYPES.has(file.mimetype)) {
+    cb(null, true)
+  } else {
+    cb(new Error(`File type "${file.mimetype}" is not supported or prohibited for security reasons.`), false)
+  }
 }
 
 export const upload = multer({

@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 import { useToastStore } from '../store/toastStore'
-import { MessageSquare, Lock, User, Mail, Smile, Eye, EyeOff, Loader2 } from 'lucide-react'
+import { MessageSquare, Lock, User, Mail, Smile, Eye, EyeOff, Loader2, Check, ShieldCheck } from 'lucide-react'
 
 export const RegisterPage = () => {
   const [formData, setFormData] = useState({
@@ -23,6 +23,26 @@ export const RegisterPage = () => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
   }
 
+  // Calculate password strength score (0 to 4)
+  const getPasswordStrength = (pass) => {
+    if (!pass) return { score: 0, label: '', color: 'transparent' }
+    let score = 0
+    if (pass.length >= 8) score += 1
+    if (/[a-z]/.test(pass) && /[A-Z]/.test(pass)) score += 1
+    if (/\d/.test(pass)) score += 1
+    if (/[^a-zA-Z0-9]/.test(pass)) score += 1
+
+    const levels = [
+      { score: 1, label: 'Weak', color: 'var(--accent-red)' },
+      { score: 2, label: 'Fair', color: '#eab308' },
+      { score: 3, label: 'Good', color: '#3b82f6' },
+      { score: 4, label: 'Strong', color: 'var(--primary-color)' },
+    ]
+    return levels[score - 1] || levels[0]
+  }
+
+  const strength = getPasswordStrength(formData.password)
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     const { username, displayName, email, password, confirmPassword } = formData
@@ -32,13 +52,13 @@ export const RegisterPage = () => {
       return
     }
 
-    if (password !== confirmPassword) {
-      addToast('Passwords do not match', 'error')
+    if (password.length < 8) {
+      addToast('Password must be at least 8 characters long', 'error')
       return
     }
 
-    if (password.length < 6) {
-      addToast('Password must be at least 6 characters', 'error')
+    if (password !== confirmPassword) {
+      addToast('Passwords do not match', 'error')
       return
     }
 
@@ -247,7 +267,7 @@ export const RegisterPage = () => {
                 letterSpacing: '0.5px',
               }}
             >
-              Password
+              Password (Min 8 Characters)
             </label>
             <div
               style={{
@@ -263,7 +283,7 @@ export const RegisterPage = () => {
               <input
                 type={showPassword ? 'text' : 'password'}
                 name="password"
-                placeholder="At least 6 characters"
+                placeholder="At least 8 characters"
                 value={formData.password}
                 onChange={handleChange}
                 style={{
@@ -282,6 +302,29 @@ export const RegisterPage = () => {
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
+
+            {/* Real-time Password Strength Meter */}
+            {formData.password && (
+              <div style={{ marginTop: '6px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Strength</span>
+                  <span style={{ fontSize: '11px', fontWeight: 600, color: strength.color }}>{strength.label}</span>
+                </div>
+                <div style={{ display: 'flex', gap: '4px', height: '4px' }}>
+                  {[1, 2, 3, 4].map((step) => (
+                    <div
+                      key={step}
+                      style={{
+                        flex: 1,
+                        borderRadius: '2px',
+                        backgroundColor: step <= strength.score ? strength.color : 'var(--border-color)',
+                        transition: 'background-color 0.2s ease',
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Confirm Password */}

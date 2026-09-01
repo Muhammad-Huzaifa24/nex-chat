@@ -23,7 +23,7 @@ const userSchema = new mongoose.Schema(
     password: {
       type: String,
       required: [true, 'Password is required'],
-      minlength: [6, 'Password must be at least 6 characters'],
+      minlength: [8, 'Password must be at least 8 characters'],
     },
     displayName: {
       type: String,
@@ -69,6 +69,10 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    otpAttempts: {
+      type: Number,
+      default: 0,
+    },
     resetPasswordOtp: {
       type: String,
       default: null,
@@ -76,6 +80,10 @@ const userSchema = new mongoose.Schema(
     resetPasswordOtpExpires: {
       type: Date,
       default: null,
+    },
+    resetPasswordOtpAttempts: {
+      type: Number,
+      default: 0,
     },
   },
   {
@@ -100,10 +108,16 @@ userSchema.methods.comparePassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password)
 }
 
-// Remove sensitive password field from JSON responses
+// Remove sensitive fields from JSON responses
 userSchema.methods.toJSON = function () {
   const obj = this.toObject()
   delete obj.password
+  delete obj.otp
+  delete obj.otpExpires
+  delete obj.otpAttempts
+  delete obj.resetPasswordOtp
+  delete obj.resetPasswordOtpExpires
+  delete obj.resetPasswordOtpAttempts
   return obj
 }
 
