@@ -9,6 +9,15 @@ import { initializeSocket } from './socket/socketManager.js'
 
 dotenv.config()
 
+// Pre-flight check for required environment variables
+const REQUIRED_ENV = ['JWT_SECRET', 'MONGO_URI']
+for (const envKey of REQUIRED_ENV) {
+  if (!process.env[envKey]) {
+    console.error(`[FATAL ERROR] Required environment variable "${envKey}" is not defined. Server cannot start.`)
+    process.exit(1)
+  }
+}
+
 const server = http.createServer(app)
 
 // Connect to MongoDB & Verify External Services (Cloudinary + Nodemailer)

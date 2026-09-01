@@ -4,11 +4,14 @@ import dotenv from 'dotenv'
 import cookieParser from 'cookie-parser'
 import helmet from 'helmet'
 import morgan from 'morgan'
+import mongoSanitize from 'express-mongo-sanitize'
+import hpp from 'hpp'
 
 import authRoutes from './routes/authRoutes.js'
 import userRoutes from './routes/userRoutes.js'
 import conversationRoutes from './routes/conversationRoutes.js'
 import messageRoutes from './routes/messageRoutes.js'
+import { apiGlobalLimiter } from './middleware/rateLimitMiddleware.js'
 
 dotenv.config()
 
@@ -40,14 +43,30 @@ const corsOptions = {
 // Apply CORS to all routes
 app.use(cors(corsOptions))
 
-// ─── Core Middleware ────────────────────────────────────────────────────────
-app.use(helmet({ contentSecurityPolicy: false }))
+// ─── Security Headers (Helmet) ─────────────────────────────────────────────
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  })
+)
+
 if (process.env.NODE_ENV !== 'production') {
   app.use(morgan('dev'))
 }
+
+// ─── Body Parsers & Sanitizers ─────────────────────────────────────────────
 app.use(express.json({ limit: '50mb' }))
 app.use(express.urlencoded({ extended: true, limit: '50mb' }))
 app.use(cookieParser())
+
+// Data Sanitization against NoSQL query injection
+app.use(mongoSanitize())
+
+// Prevent HTTP Parameter Pollution attacks
+app.use(hpp())
+
+// ─── Rate Limiting ─────────────────────────────────────────────────────────
+app.use('/api', apiGlobalLimiter)
 
 // ─── API Routes ─────────────────────────────────────────────────────────────
 app.use('/api/auth', authRoutes)
@@ -75,9 +94,16 @@ app.use((err, req, res, next) => {
   }
 
   console.error('[Unhandled Error]', err)
+
+  // In production, avoid leaking internal database or stack traces
+  const isProduction = process.env.NODE_ENV === 'production'
+  const message = isProduction
+    ? 'An unexpected error occurred. Please try again later.'
+    : err.message || 'Internal Server Error'
+
   res.status(err.status || 500).json({
     success: false,
-    message: err.message || 'Internal Server Error',
+    message,
   })
 })
 

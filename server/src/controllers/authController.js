@@ -24,6 +24,13 @@ export const register = async (req, res) => {
       })
     }
 
+    if (password.length < 8) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 8 characters long',
+      })
+    }
+
     // Check if user or email already exists
     const existingUser = await User.findOne({
       $or: [{ email: email.toLowerCase() }, { username: username.toLowerCase() }],
@@ -35,11 +42,12 @@ export const register = async (req, res) => {
         const otp = generateOtp()
         existingUser.otp = otp
         existingUser.otpExpires = new Date(Date.now() + 15 * 60 * 1000)
+        existingUser.otpAttempts = 0
         await existingUser.save()
         await sendVerificationOtp(existingUser.email, existingUser.displayName, otp)
         return res.status(200).json({
           success: true,
-          message: 'OTP resent to your email. Please verify your account.',
+          message: 'Verification code resent to your email. Please verify your account.',
           email: existingUser.email,
           requiresVerification: true,
         })
@@ -62,6 +70,7 @@ export const register = async (req, res) => {
       isVerified: false,
       otp,
       otpExpires,
+      otpAttempts: 0,
     })
 
     // Send OTP email in background so user response is instant (<100ms)
@@ -90,7 +99,7 @@ export const verifyEmail = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Email and OTP are required' })
     }
 
-    const user = await User.findOne({ email: email.toLowerCase() })
+    const user = await User.findOne({ email: email.toLowerCase().trim() })
 
     if (!user) {
       return res.status(404).json({ success: false, message: 'No account found with this email' })
@@ -108,14 +117,34 @@ export const verifyEmail = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Verification code has expired. Please request a new one.' })
     }
 
-    if (user.otp !== String(otp)) {
-      return res.status(400).json({ success: false, message: 'Invalid verification code. Please try again.' })
+    // OTP Brute-force protection: Max 5 attempts
+    if (user.otp !== String(otp).trim()) {
+      user.otpAttempts = (user.otpAttempts || 0) + 1
+
+      if (user.otpAttempts >= 5) {
+        user.otp = null
+        user.otpExpires = null
+        user.otpAttempts = 0
+        await user.save()
+        return res.status(429).json({
+          success: false,
+          message: 'Too many incorrect attempts. This code has been invalidated. Please request a new one.',
+        })
+      }
+
+      await user.save()
+      const remaining = 5 - user.otpAttempts
+      return res.status(400).json({
+        success: false,
+        message: `Invalid verification code. ${remaining} attempt${remaining === 1 ? '' : 's'} remaining.`,
+      })
     }
 
-    // Mark as verified and clear OTP
+    // Mark as verified and clear OTP & attempt counters
     user.isVerified = true
     user.otp = null
     user.otpExpires = null
+    user.otpAttempts = 0
     user.isOnline = true
     await user.save()
 
@@ -143,7 +172,7 @@ export const resendOtp = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Email is required' })
     }
 
-    const user = await User.findOne({ email: email.toLowerCase() })
+    const user = await User.findOne({ email: email.toLowerCase().trim() })
 
     if (!user) {
       return res.status(404).json({ success: false, message: 'No account found with this email' })
@@ -164,6 +193,7 @@ export const resendOtp = async (req, res) => {
     const otp = generateOtp()
     user.otp = otp
     user.otpExpires = new Date(Date.now() + 15 * 60 * 1000)
+    user.otpAttempts = 0
     await user.save()
 
     // Send OTP email in background
@@ -278,7 +308,7 @@ export const getMe = async (req, res) => {
   }
 }
 
-// @desc    Request password reset OTP
+// @desc    Request password reset OTP (Fixed user enumeration)
 // @route   POST /api/auth/forgot-password
 export const forgotPassword = async (req, res) => {
   try {
@@ -296,10 +326,11 @@ export const forgotPassword = async (req, res) => {
       $or: [{ email: searchStr }, { username: searchStr }],
     })
 
+    // Protection against User Enumeration: If user not found, return generic success message
     if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'No account found with that email or username',
+      return res.status(200).json({
+        success: true,
+        message: 'If an account exists with that email or username, a verification code has been sent.',
       })
     }
 
@@ -317,6 +348,7 @@ export const forgotPassword = async (req, res) => {
     const otp = generateOtp()
     user.resetPasswordOtp = otp
     user.resetPasswordOtpExpires = new Date(Date.now() + 15 * 60 * 1000)
+    user.resetPasswordOtpAttempts = 0
     await user.save()
 
     // Dispatch Reset OTP email in background for instant HTTP response (<100ms)
@@ -326,7 +358,7 @@ export const forgotPassword = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: 'Password reset code sent to your email.',
+      message: 'If an account exists with that email or username, a verification code has been sent.',
       email: user.email,
     })
   } catch (error) {
@@ -370,10 +402,26 @@ export const verifyResetOtp = async (req, res) => {
       })
     }
 
+    // OTP Brute-force protection: Max 5 attempts
     if (user.resetPasswordOtp !== String(otp).trim()) {
+      user.resetPasswordOtpAttempts = (user.resetPasswordOtpAttempts || 0) + 1
+
+      if (user.resetPasswordOtpAttempts >= 5) {
+        user.resetPasswordOtp = null
+        user.resetPasswordOtpExpires = null
+        user.resetPasswordOtpAttempts = 0
+        await user.save()
+        return res.status(429).json({
+          success: false,
+          message: 'Too many incorrect attempts. This code has been invalidated. Please request a new code.',
+        })
+      }
+
+      await user.save()
+      const remaining = 5 - user.resetPasswordOtpAttempts
       return res.status(400).json({
         success: false,
-        message: 'Invalid verification code. Please check and try again.',
+        message: `Invalid verification code. ${remaining} attempt${remaining === 1 ? '' : 's'} remaining.`,
       })
     }
 
@@ -399,10 +447,10 @@ export const resetPassword = async (req, res) => {
       })
     }
 
-    if (newPassword.length < 6) {
+    if (newPassword.length < 8) {
       return res.status(400).json({
         success: false,
-        message: 'Password must be at least 6 characters',
+        message: 'Password must be at least 8 characters long',
       })
     }
 
@@ -440,6 +488,7 @@ export const resetPassword = async (req, res) => {
     user.password = newPassword
     user.resetPasswordOtp = null
     user.resetPasswordOtpExpires = null
+    user.resetPasswordOtpAttempts = 0
     // If user was not verified, resetting password via email confirms email ownership
     user.isVerified = true
     await user.save()
@@ -452,4 +501,3 @@ export const resetPassword = async (req, res) => {
     res.status(500).json({ success: false, message: error.message })
   }
 }
-

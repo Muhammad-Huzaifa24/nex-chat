@@ -164,8 +164,8 @@ export const ForgotPasswordPage = () => {
       return
     }
 
-    if (newPassword.length < 6) {
-      addToast('Password must be at least 6 characters', 'error')
+    if (newPassword.length < 8) {
+      addToast('Password must be at least 8 characters', 'error')
       return
     }
 
@@ -517,7 +517,7 @@ export const ForgotPasswordPage = () => {
                 <Lock size={18} color="var(--text-muted)" />
                 <input
                   type={showNewPassword ? 'text' : 'password'}
-                  placeholder="At least 6 characters"
+                  placeholder="At least 8 characters"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   autoFocus
