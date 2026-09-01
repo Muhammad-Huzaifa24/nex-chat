@@ -1,10 +1,22 @@
 import express from 'express'
-import { searchUsers, getUserById, updateProfile, updateAvatar, heartbeat, setOffline } from '../controllers/userController.js'
+import {
+  searchUsers,
+  getUserById,
+  updateProfile,
+  updateAvatar,
+  heartbeat,
+  setOffline,
+  getPublicProfile,
+} from '../controllers/userController.js'
 import { protect } from '../middleware/authMiddleware.js'
 import { upload } from '../middleware/uploadMiddleware.js'
 
 const router = express.Router()
 
+// Public route to view a user profile by username
+router.get('/profile/:username', getPublicProfile)
+
+// Protected routes
 router.use(protect)
 
 router.get('/search', searchUsers)
@@ -15,3 +27,4 @@ router.put('/profile', updateProfile)
 router.put('/avatar', upload.single('avatar'), updateAvatar)
 
 export default router
+

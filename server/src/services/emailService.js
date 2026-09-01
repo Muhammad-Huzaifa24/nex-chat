@@ -2,6 +2,8 @@ import nodemailer from 'nodemailer'
 import dotenv from 'dotenv'
 import User from '../models/User.js'
 import { getOfflineNotificationEmail } from '../templates/offlineNotification.js'
+import { getVerificationEmail } from '../templates/verificationEmail.js'
+import { getResetPasswordEmail } from '../templates/resetPasswordEmail.js'
 
 dotenv.config()
 
@@ -27,6 +29,11 @@ const getTransporter = () => {
         user: emailUser,
         pass: emailPass,
       },
+      connectionTimeout: 8000,
+      greetingTimeout: 5000,
+      socketTimeout: 10000,
+      pool: true,
+      maxConnections: 3,
     })
   } else {
     transporter = nodemailer.createTransport({
@@ -35,6 +42,11 @@ const getTransporter = () => {
         user: emailUser,
         pass: emailPass,
       },
+      connectionTimeout: 8000,
+      greetingTimeout: 5000,
+      socketTimeout: 10000,
+      pool: true,
+      maxConnections: 3,
     })
   }
 
@@ -127,3 +139,69 @@ export const sendOfflineNotification = async (recipient, sender, message, conver
     console.error(`[Email Service Error] Failed to send email:`, error.message)
   }
 }
+
+/**
+ * Send a 6-digit OTP email for email verification or password reset
+ * @param {string} toEmail - Recipient email
+ * @param {string} displayName - Recipient's display name
+ * @param {string} otp - 6-digit OTP code
+ * @param {string} subject - Email subject line
+ */
+export const sendVerificationOtp = async (toEmail, displayName, otp, subject = 'Verify your NexChat account') => {
+  try {
+    const transport = getTransporter()
+    if (!transport) {
+      console.warn('[Email Service] Skipping OTP email — transporter not configured')
+      return false
+    }
+
+    const fromAddress = process.env.EMAIL_FROM || `"NexChat" <${process.env.EMAIL_USER}>`
+    const html = getVerificationEmail({ displayName, otp })
+
+    await transport.sendMail({
+      from: fromAddress,
+      to: toEmail,
+      subject,
+      html,
+    })
+
+    console.log(`[Email Service] OTP email sent to ${toEmail}`)
+    return true
+  } catch (error) {
+    console.error(`[Email Service Error] Failed to send OTP email:`, error.message)
+    return false
+  }
+}
+
+/**
+ * Send a 6-digit OTP email for password reset
+ * @param {string} toEmail - Recipient email
+ * @param {string} displayName - Recipient's display name
+ * @param {string} otp - 6-digit OTP code
+ */
+export const sendResetPasswordOtp = async (toEmail, displayName, otp) => {
+  try {
+    const transport = getTransporter()
+    if (!transport) {
+      console.warn('[Email Service] Skipping Password Reset email — transporter not configured')
+      return false
+    }
+
+    const fromAddress = process.env.EMAIL_FROM || `"NexChat" <${process.env.EMAIL_USER}>`
+    const html = getResetPasswordEmail({ displayName, otp })
+
+    await transport.sendMail({
+      from: fromAddress,
+      to: toEmail,
+      subject: 'Reset your NexChat password',
+      html,
+    })
+
+    console.log(`[Email Service] Password Reset OTP email sent to ${toEmail}`)
+    return true
+  } catch (error) {
+    console.error(`[Email Service Error] Failed to send Reset OTP email:`, error.message)
+    return false
+  }
+}
+

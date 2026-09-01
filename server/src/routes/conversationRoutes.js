@@ -1,6 +1,7 @@
 import express from 'express'
 import {
   getOrCreateDirect,
+  getOrCreateByUsername,
   getUserConversations,
   createGroup,
   updateGroup,
@@ -18,6 +19,7 @@ router.use(protect)
 
 router.get('/', getUserConversations)
 router.post('/direct', getOrCreateDirect)
+router.post('/direct/user/:username', getOrCreateByUsername)
 router.post('/group', upload.single('groupAvatar'), createGroup)
 router.put('/group/:id', upload.single('groupAvatar'), updateGroup)
 router.post('/group/:id/members', addGroupMember)

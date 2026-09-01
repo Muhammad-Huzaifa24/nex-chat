@@ -1,5 +1,4 @@
 import axios from 'axios'
-import { useLoaderStore } from '../store/loaderStore'
 
 const API_URL = import.meta.env.VITE_API_URL || '/api'
 
@@ -11,44 +10,10 @@ const api = axios.create({
   },
 })
 
-const isSilentRequest = (url) => {
-  if (!url) return false
-  return (
-    url.includes('/typing') ||
-    url.includes('/heartbeat') ||
-    url.includes('/offline') ||
-    url.includes('/read') ||
-    url.includes('/deliver') ||
-    url.includes('/messages')
-  )
-}
-
-// Intercept requests to trigger global loader (skip silent background calls)
-api.interceptors.request.use(
-  (config) => {
-    if (!isSilentRequest(config.url)) {
-      useLoaderStore.getState().startLoading()
-    }
-    return config
-  },
-  (error) => {
-    useLoaderStore.getState().stopLoading()
-    return Promise.reject(error)
-  }
-)
-
-// Intercept responses to stop loader & handle errors
+// Intercept responses to handle errors cleanly
 api.interceptors.response.use(
-  (response) => {
-    if (!isSilentRequest(response.config?.url)) {
-      useLoaderStore.getState().stopLoading()
-    }
-    return response
-  },
+  (response) => response,
   (error) => {
-    if (!isSilentRequest(error.config?.url)) {
-      useLoaderStore.getState().stopLoading()
-    }
     if (error.response && error.response.status === 401) {
       // User is not authenticated
     }
@@ -57,3 +22,4 @@ api.interceptors.response.use(
 )
 
 export default api
+

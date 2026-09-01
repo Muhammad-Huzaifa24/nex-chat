@@ -27,7 +27,13 @@ export const LoginPage = () => {
 
     if (result.success) {
       addToast(`Welcome back, ${result.user.displayName}!`, 'success')
-      navigate('/')
+      const redirectUrl = sessionStorage.getItem('nexchat_redirect')
+      if (redirectUrl) {
+        sessionStorage.removeItem('nexchat_redirect')
+        navigate(redirectUrl)
+      } else {
+        navigate('/')
+      }
     } else {
       addToast(result.message, 'error')
     }
@@ -128,19 +134,31 @@ export const LoginPage = () => {
 
           {/* Password Field */}
           <div>
-            <label
-              style={{
-                display: 'block',
-                fontSize: 'var(--font-size-xs)',
-                fontWeight: 600,
-                color: 'var(--text-secondary)',
-                marginBottom: '6px',
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px',
-              }}
-            >
-              Password
-            </label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: 'var(--font-size-xs)',
+                  fontWeight: 600,
+                  color: 'var(--text-secondary)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                }}
+              >
+                Password
+              </label>
+              <Link
+                to="/forgot-password"
+                style={{
+                  fontSize: 'var(--font-size-xs)',
+                  color: 'var(--primary-color)',
+                  textDecoration: 'none',
+                  fontWeight: 500,
+                }}
+              >
+                Forgot password?
+              </Link>
+            </div>
             <div
               style={{
                 display: 'flex',

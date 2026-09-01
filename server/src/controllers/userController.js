@@ -124,3 +124,27 @@ export const setOffline = async (req, res) => {
     res.status(500).json({ success: false, message: error.message })
   }
 }
+
+// @desc    Get public user profile by username (no auth required)
+// @route   GET /api/users/profile/:username
+export const getPublicProfile = async (req, res) => {
+  try {
+    const { username } = req.params
+    if (!username) {
+      return res.status(400).json({ success: false, message: 'Username is required' })
+    }
+
+    const user = await User.findOne({ username: username.toLowerCase().trim() }).select(
+      'username displayName avatar bio isOnline lastSeen'
+    )
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' })
+    }
+
+    res.status(200).json({ success: true, user })
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message })
+  }
+}
+

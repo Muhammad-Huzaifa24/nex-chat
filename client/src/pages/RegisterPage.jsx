@@ -47,8 +47,8 @@ export const RegisterPage = () => {
     setLoading(false)
 
     if (result.success) {
-      addToast('Account created successfully!', 'success')
-      navigate('/')
+      addToast('Account created! Check your email for a 6-digit verification code.', 'success')
+      navigate('/verify-email')
     } else {
       addToast(result.message, 'error')
     }

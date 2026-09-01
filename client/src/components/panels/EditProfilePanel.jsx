@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Avatar } from '../ui/Avatar'
-import { ArrowLeft, X, Camera, Check, Loader2, User, Info, Phone, Mail } from 'lucide-react'
+import { ArrowLeft, X, Camera, Check, Loader2, User, Info, Phone, Mail, Share2, Copy, ExternalLink } from 'lucide-react'
 import api from '../../services/api'
 import { useAuthStore } from '../../store/authStore'
 import { useToastStore } from '../../store/toastStore'
@@ -230,6 +230,114 @@ export const EditProfilePanel = ({ onClose }) => {
               placeholder="+1 234 567 8900"
               style={{ width: '100%', fontSize: 'var(--font-size-sm)', color: 'var(--text-primary)' }}
             />
+          </div>
+        </div>
+
+        {/* Share Profile Link */}
+        <div>
+          <label style={{ fontSize: 'var(--font-size-xs)', fontWeight: 600, color: 'var(--primary-color)', display: 'block', marginBottom: 4 }}>
+            SHARE PROFILE LINK
+          </label>
+          <div
+            style={{
+              backgroundColor: 'var(--bg-surface)',
+              borderRadius: 'var(--radius-md)',
+              padding: '12px',
+              border: '1px solid var(--border-color)',
+            }}
+          >
+            <p style={{ fontSize: '11px', color: 'var(--text-secondary)', margin: '0 0 8px 0', lineHeight: 1.4 }}>
+              Share your direct link with others so they can chat with you instantly without searching.
+            </p>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                backgroundColor: 'var(--bg-app)',
+                borderRadius: 'var(--radius-sm)',
+                padding: '6px 10px',
+                border: '1px solid var(--border-color)',
+                marginBottom: '10px',
+              }}
+            >
+              <span
+                style={{
+                  fontSize: '12px',
+                  color: 'var(--primary-color)',
+                  fontWeight: 600,
+                  fontFamily: 'monospace',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  flex: 1,
+                }}
+              >
+                {`${window.location.origin}/u/${user?.username}`}
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  const link = `${window.location.origin}/u/${user?.username}`
+                  navigator.clipboard.writeText(link)
+                  addToast('Profile link copied to clipboard!', 'success')
+                }}
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  padding: '8px 12px',
+                  borderRadius: 'var(--radius-sm)',
+                  backgroundColor: 'rgba(0, 168, 132, 0.1)',
+                  border: '1px solid rgba(0, 168, 132, 0.3)',
+                  color: 'var(--primary-color)',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                <Copy size={14} />
+                Copy Link
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const link = `${window.location.origin}/u/${user?.username}`
+                  if (navigator.share) {
+                    navigator.share({
+                      title: `Chat with ${user?.displayName} on NexChat`,
+                      text: `Connect and chat with me on NexChat:`,
+                      url: link,
+                    }).catch(() => {})
+                  } else {
+                    const waUrl = `https://wa.me/?text=${encodeURIComponent(`Chat with me on NexChat: ${link}`)}`
+                    window.open(waUrl, '_blank')
+                  }
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  padding: '8px 12px',
+                  borderRadius: 'var(--radius-sm)',
+                  backgroundColor: 'var(--bg-app)',
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--text-primary)',
+                  fontSize: '12px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                }}
+              >
+                <Share2 size={14} />
+                Share
+              </button>
+            </div>
           </div>
         </div>
 

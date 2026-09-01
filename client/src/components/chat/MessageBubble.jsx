@@ -22,6 +22,8 @@ export const MessageBubble = ({
   onDelete,
   onRetry,
   onImageClick,
+  onScrollToMessage,
+  isHighlighted = false,
 }) => {
   const [showOptions, setShowOptions] = useState(false)
   const [showReactionPicker, setShowReactionPicker] = useState(false)
@@ -132,6 +134,7 @@ export const MessageBubble = ({
 
         {/* Message Bubble Box */}
         <div
+          className={isHighlighted ? 'highlight-flash' : ''}
           style={{
             backgroundColor: isOutgoing ? 'var(--bubble-outgoing)' : 'var(--bubble-incoming)',
             color: isOutgoing ? 'var(--bubble-outgoing-text)' : 'var(--bubble-incoming-text)',
@@ -145,6 +148,7 @@ export const MessageBubble = ({
             maxWidth: '100%',
             wordBreak: 'break-word',
             border: isFailed ? '1px solid var(--accent-red)' : 'none',
+            transition: 'background-color 0.3s ease, box-shadow 0.3s ease',
           }}
         >
           {/* Sender Name in Groups */}
@@ -162,20 +166,39 @@ export const MessageBubble = ({
             </div>
           )}
 
-          {/* Quoted / Replied Message Preview */}
+          {/* Quoted / Replied Message Preview — Click to jump to original message */}
           {message.replyTo && (
             <div
+              onClick={(e) => {
+                e.stopPropagation()
+                const targetId = message.replyTo?._id || message.replyTo
+                if (targetId && onScrollToMessage) {
+                  onScrollToMessage(targetId)
+                }
+              }}
+              title="Click to view original message"
               style={{
-                backgroundColor: 'rgba(0,0,0,0.06)',
+                backgroundColor: 'rgba(0,0,0,0.07)',
                 borderLeft: '3px solid var(--primary-color)',
                 borderRadius: 'var(--radius-xs)',
                 padding: '4px 8px',
                 marginBottom: 6,
                 fontSize: 'var(--font-size-xs)',
+                cursor: 'pointer',
+                transition: 'background-color 0.15s ease, transform 0.15s ease',
+                userSelect: 'none',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(0,168,132,0.18)'
+                e.currentTarget.style.transform = 'translateX(2px)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.07)'
+                e.currentTarget.style.transform = 'translateX(0)'
               }}
             >
               <div style={{ fontWeight: 600, color: 'var(--primary-color)' }}>
-                {message.replyTo.senderId?.displayName || 'User'}
+                {message.replyTo.senderId?.displayName || message.replyTo.senderId?.username || 'User'}
               </div>
               <div style={{ color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {message.replyTo.content || (message.replyTo.type !== 'text' ? `[${message.replyTo.type}]` : '')}

@@ -49,8 +49,66 @@ export const getOrCreateDirect = async (req, res) => {
   }
 }
 
+// @desc    Get or create 1-to-1 conversation by username
+// @route   POST /api/conversations/direct/user/:username
+export const getOrCreateByUsername = async (req, res) => {
+  try {
+    const { username } = req.params
+    const userId = req.user._id
+
+    if (!username) {
+      return res.status(400).json({ success: false, message: 'Username is required' })
+    }
+
+    const targetUser = await User.findOne({ username: username.toLowerCase().trim() })
+    if (!targetUser) {
+      return res.status(404).json({ success: false, message: 'User not found' })
+    }
+
+    const recipientId = targetUser._id
+
+    if (userId.toString() === recipientId.toString()) {
+      return res.status(400).json({ success: false, message: 'Cannot start conversation with yourself' })
+    }
+
+    // Check if direct conversation already exists
+    let conversation = await Conversation.findOne({
+      isGroup: false,
+      participants: { $all: [userId, recipientId], $size: 2 },
+    })
+      .populate('participants', 'username displayName avatar bio isOnline lastSeen')
+      .populate({
+        path: 'lastMessage',
+        populate: { path: 'senderId', select: 'username displayName' },
+      })
+
+    if (!conversation) {
+      conversation = await Conversation.create({
+        participants: [userId, recipientId],
+        isGroup: false,
+      })
+
+      conversation = await Conversation.findById(conversation._id).populate(
+        'participants',
+        'username displayName avatar bio isOnline lastSeen'
+      )
+    } else {
+      // Unhide if was hidden
+      if (conversation.hiddenFor.includes(userId)) {
+        conversation.hiddenFor = conversation.hiddenFor.filter((id) => id.toString() !== userId.toString())
+        await conversation.save()
+      }
+    }
+
+    res.status(200).json({ success: true, conversation })
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message })
+  }
+}
+
 // @desc    Get all conversations for logged in user
 // @route   GET /api/conversations
+
 export const getUserConversations = async (req, res) => {
   try {
     const userId = req.user._id

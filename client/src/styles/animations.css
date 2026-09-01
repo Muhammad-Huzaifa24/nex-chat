@@ -122,6 +122,20 @@
   }
 }
 
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 0.9s linear infinite;
+  transform-origin: center;
+}
+
 .animate-fade-in { animation: fadeIn var(--transition-normal) ease forwards; }
 .animate-fade-out { animation: fadeOut 0.25s ease forwards; }
 .animate-slide-up { animation: slideUp var(--transition-normal) cubic-bezier(0.16, 1, 0.3, 1) forwards; }
@@ -130,3 +144,27 @@
 .animate-scale-up { animation: scaleUp var(--transition-fast) cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 .animate-toast-in { animation: toastIn 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 .animate-toast-out { animation: toastOut 0.28s cubic-bezier(0.4, 0, 1, 1) forwards; }
+
+@keyframes highlightFlash {
+  0% {
+    background-color: rgba(0, 168, 132, 0.4);
+    box-shadow: 0 0 0 4px rgba(0, 168, 132, 0.3);
+    transform: scale(1.02);
+  }
+  50% {
+    background-color: rgba(0, 168, 132, 0.2);
+    box-shadow: 0 0 0 2px rgba(0, 168, 132, 0.15);
+  }
+  100% {
+    background-color: transparent;
+    box-shadow: none;
+    transform: scale(1);
+  }
+}
+
+.highlight-flash {
+  animation: highlightFlash 1.6s ease-out forwards !important;
+  border-radius: var(--radius-md);
+}
+
+
