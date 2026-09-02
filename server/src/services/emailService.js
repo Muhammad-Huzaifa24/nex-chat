@@ -1,4 +1,4 @@
-import nodemailer from 'nodemailer'
+import emailjs from '@emailjs/nodejs'
 import dotenv from 'dotenv'
 import User from '../models/User.js'
 import { getOfflineNotificationEmail } from '../templates/offlineNotification.js'
@@ -7,73 +7,121 @@ import { getResetPasswordEmail } from '../templates/resetPasswordEmail.js'
 
 dotenv.config()
 
-let transporter = null
+/**
+ * Logs EmailJS initialization status on server boot
+ */
+export const verifyEmailConnection = async () => {
+  const serviceId = process.env.EMAILJS_SERVICE_ID
+  const templateId = process.env.EMAILJS_TEMPLATE_ID
+  const publicKey = process.env.EMAILJS_PUBLIC_KEY
+  const privateKey = process.env.EMAILJS_PRIVATE_KEY
 
-const getTransporter = () => {
-  if (transporter) return transporter
-
-  const emailUser = process.env.EMAIL_USER?.trim()
-  const emailPass = process.env.EMAIL_PASS?.trim()
-
-  if (!emailUser || !emailPass) {
-    return null
+  if (!serviceId || !templateId || !publicKey || !privateKey) {
+    console.warn('[Email / EmailJS] Warning: EmailJS credentials not fully set in .env (email notifications disabled)')
+    return false
   }
 
-  // If host/port are provided use them, otherwise default to Gmail
-  if (process.env.EMAIL_HOST) {
-    transporter = nodemailer.createTransport({
-      host: process.env.EMAIL_HOST.trim(),
-      port: parseInt(process.env.EMAIL_PORT) || 587,
-      secure: process.env.EMAIL_SECURE === 'true',
-      auth: {
-        user: emailUser,
-        pass: emailPass,
-      },
-      connectionTimeout: 8000,
-      greetingTimeout: 5000,
-      socketTimeout: 10000,
-      pool: true,
-      maxConnections: 3,
-    })
-  } else {
-    transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: emailUser,
-        pass: emailPass,
-      },
-      connectionTimeout: 8000,
-      greetingTimeout: 5000,
-      socketTimeout: 10000,
-      pool: true,
-      maxConnections: 3,
-    })
-  }
-
-  return transporter
+  console.log('[Email / EmailJS] Ready — configured for transactional emails via EmailJS')
+  return true
 }
 
 /**
- * Verifies the Nodemailer connection on server boot and logs status
+ * Unified email dispatcher via EmailJS REST API
+ * @param {object} params
+ * @param {string} params.toEmail - Recipient email
+ * @param {string} params.toName - Recipient display name
+ * @param {string} params.subject - Email subject
+ * @param {string} params.otpCode - (Optional) 6-digit OTP code
+ * @param {string} params.htmlContent - Full HTML email body
+ * @returns {Promise<boolean>}
  */
-export const verifyEmailConnection = async () => {
-  const emailUser = process.env.EMAIL_USER?.trim()
-  const emailPass = process.env.EMAIL_PASS?.trim()
+const sendEmail = async ({ toEmail, toName, subject, otpCode, htmlContent }) => {
+  const serviceId = process.env.EMAILJS_SERVICE_ID
+  const templateId = process.env.EMAILJS_TEMPLATE_ID
+  const publicKey = process.env.EMAILJS_PUBLIC_KEY
+  const privateKey = process.env.EMAILJS_PRIVATE_KEY
 
-  if (!emailUser || !emailPass) {
-    console.warn('[Email / Nodemailer] Warning: EMAIL_USER or EMAIL_PASS not set in .env (offline email notifications disabled)')
+  if (!serviceId || !templateId || !publicKey || !privateKey) {
+    console.warn('[Email / EmailJS] Skipping email — EmailJS credentials not fully configured in .env')
     return false
   }
 
   try {
-    const transport = getTransporter()
-    if (!transport) return false
+    const response = await emailjs.send(
+      serviceId,
+      templateId,
+      {
+        to_email: toEmail,
+        to_name: toName || 'there',
+        subject,
+        otp_code: otpCode || '',
+        html_content: htmlContent,
+      },
+      {
+        publicKey,
+        privateKey,
+      }
+    )
 
-    await transport.verify()
-    console.log(`[Email / Nodemailer] Connected: ${emailUser} (SMTP Ready)`)
-    return true
+    if (response.status === 200) {
+      return true
+    } else {
+      console.error('[Email / EmailJS Error] Unexpected status:', response.status, response.text)
+      return false
+    }
   } catch (error) {
-    console.error(`[Email / Nodemailer Error] Verification failed: ${error.message}`)
+    console.error('[Email / EmailJS Error] Send failed:', error?.message || error)
+    return false
+  }
+}
+
+/**
+ * Send a 6-digit OTP email for email verification
+ * @param {string} toEmail - Recipient email
+ * @param {string} displayName - Recipient's display name
+ * @param {string} otp - 6-digit OTP code
+ * @param {string} subject - Email subject line
+ * @returns {Promise<boolean>}
+ */
+export const sendVerificationOtp = async (toEmail, displayName, otp, subject = 'Verify your NexChat account') => {
+  try {
+    const htmlContent = getVerificationEmail({ displayName, otp })
+    const sent = await sendEmail({
+      toEmail,
+      toName: displayName,
+      subject,
+      otpCode: otp,
+      htmlContent,
+    })
+    if (sent) console.log(`[Email Service] Verification OTP email sent to ${toEmail}`)
+    return sent
+  } catch (error) {
+    console.error(`[Email Service Error] Failed to send Verification OTP:`, error.message)
+    return false
+  }
+}
+
+/**
+ * Send a 6-digit OTP email for password reset
+ * @param {string} toEmail - Recipient email
+ * @param {string} displayName - Recipient's display name
+ * @param {string} otp - 6-digit OTP code
+ * @returns {Promise<boolean>}
+ */
+export const sendResetPasswordOtp = async (toEmail, displayName, otp) => {
+  try {
+    const htmlContent = getResetPasswordEmail({ displayName, otp })
+    const sent = await sendEmail({
+      toEmail,
+      toName: displayName,
+      subject: 'Reset your NexChat password',
+      otpCode: otp,
+      htmlContent,
+    })
+    if (sent) console.log(`[Email Service] Password Reset OTP email sent to ${toEmail}`)
+    return sent
+  } catch (error) {
+    console.error(`[Email Service Error] Failed to send Reset OTP:`, error.message)
     return false
   }
 }
@@ -87,12 +135,6 @@ export const verifyEmailConnection = async () => {
  */
 export const sendOfflineNotification = async (recipient, sender, message, conversation) => {
   try {
-    const transport = getTransporter()
-    if (!transport) {
-      // Graceful no-op if email credentials are not configured
-      return
-    }
-
     if (!recipient || !recipient.email) return
 
     // Cooldown check (30 minutes)
@@ -106,12 +148,10 @@ export const sendOfflineNotification = async (recipient, sender, message, conver
     }
 
     const appUrl = process.env.CLIENT_URL || 'https://nex-chat-wjpg.vercel.app'
-    const fromAddress = process.env.EMAIL_FROM || `"NexChat" <${process.env.EMAIL_USER}>`
-
     const isGroup = conversation?.isGroup || false
     const chatName = isGroup ? conversation.groupName : sender.displayName || sender.username
 
-    const html = getOfflineNotificationEmail({
+    const htmlContent = getOfflineNotificationEmail({
       recipientName: recipient.displayName || recipient.username,
       senderName: sender.displayName || sender.username,
       messageContent: message.content,
@@ -125,83 +165,18 @@ export const sendOfflineNotification = async (recipient, sender, message, conver
       ? `💬 New message in ${chatName} from ${sender.displayName || sender.username}`
       : `💬 New message from ${sender.displayName || sender.username}`
 
-    await transport.sendMail({
-      from: fromAddress,
-      to: recipient.email,
+    const sent = await sendEmail({
+      toEmail: recipient.email,
+      toName: recipient.displayName || recipient.username,
       subject,
-      html,
+      htmlContent,
     })
 
-    // Update recipient lastNotifiedAt timestamp
-    await User.findByIdAndUpdate(recipient._id, { lastNotifiedAt: new Date() })
-    console.log(`[Email Service] Notification email sent to ${recipient.email}`)
-  } catch (error) {
-    console.error(`[Email Service Error] Failed to send email:`, error.message)
-  }
-}
-
-/**
- * Send a 6-digit OTP email for email verification or password reset
- * @param {string} toEmail - Recipient email
- * @param {string} displayName - Recipient's display name
- * @param {string} otp - 6-digit OTP code
- * @param {string} subject - Email subject line
- */
-export const sendVerificationOtp = async (toEmail, displayName, otp, subject = 'Verify your NexChat account') => {
-  try {
-    const transport = getTransporter()
-    if (!transport) {
-      console.warn('[Email Service] Skipping OTP email — transporter not configured')
-      return false
+    if (sent) {
+      await User.findByIdAndUpdate(recipient._id, { lastNotifiedAt: new Date() })
+      console.log(`[Email Service] Notification email sent to ${recipient.email}`)
     }
-
-    const fromAddress = process.env.EMAIL_FROM || `"NexChat" <${process.env.EMAIL_USER}>`
-    const html = getVerificationEmail({ displayName, otp })
-
-    await transport.sendMail({
-      from: fromAddress,
-      to: toEmail,
-      subject,
-      html,
-    })
-
-    console.log(`[Email Service] OTP email sent to ${toEmail}`)
-    return true
   } catch (error) {
-    console.error(`[Email Service Error] Failed to send OTP email:`, error.message)
-    return false
+    console.error(`[Email Service Error] Failed to send offline notification:`, error.message)
   }
 }
-
-/**
- * Send a 6-digit OTP email for password reset
- * @param {string} toEmail - Recipient email
- * @param {string} displayName - Recipient's display name
- * @param {string} otp - 6-digit OTP code
- */
-export const sendResetPasswordOtp = async (toEmail, displayName, otp) => {
-  try {
-    const transport = getTransporter()
-    if (!transport) {
-      console.warn('[Email Service] Skipping Password Reset email — transporter not configured')
-      return false
-    }
-
-    const fromAddress = process.env.EMAIL_FROM || `"NexChat" <${process.env.EMAIL_USER}>`
-    const html = getResetPasswordEmail({ displayName, otp })
-
-    await transport.sendMail({
-      from: fromAddress,
-      to: toEmail,
-      subject: 'Reset your NexChat password',
-      html,
-    })
-
-    console.log(`[Email Service] Password Reset OTP email sent to ${toEmail}`)
-    return true
-  } catch (error) {
-    console.error(`[Email Service Error] Failed to send Reset OTP email:`, error.message)
-    return false
-  }
-}
-
