@@ -199,64 +199,49 @@ export const MessageInput = ({
         </div>
       )}
 
-      {/* Input row */}
+      {/* Input row — WhatsApp style */}
       <div
         style={{
           display: 'flex',
           alignItems: 'flex-end',
-          padding: '8px 12px',
-          gap: 8,
-          minHeight: 'var(--input-area-height, 56px)',
+          padding: '6px 8px',
+          gap: 6,
+          minHeight: 'var(--input-area-height, 52px)',
         }}
       >
-        {/* Emoji Button */}
-        <button
-          type="button"
-          onClick={() => {
-            setShowEmoji(!showEmoji)
-            setShowAttachment(false)
-          }}
-          className="btn-icon"
-          title="Emoji"
-        >
-          <Smile size={22} />
-        </button>
-
-        {/* Attachment Button */}
-        <button
-          type="button"
-          onClick={() => {
-            setShowAttachment(!showAttachment)
-            setShowEmoji(false)
-          }}
-          className="btn-icon"
-          title="Attach files"
-        >
-          <Paperclip size={22} />
-        </button>
-
-        {/* Direct Camera Button (Mobile camera capture) */}
-        <button
-          type="button"
-          onClick={() => cameraInputRef.current?.click()}
-          className="btn-icon"
-          title="Camera"
-        >
-          <Camera size={22} />
-        </button>
-
-        {/* Text Area */}
+        {/* Rounded input container with icons inside */}
         <div
           style={{
             flex: 1,
-            backgroundColor: 'var(--bg-app)',
-            borderRadius: 'var(--radius-lg)',
-            padding: '8px 14px',
             display: 'flex',
-            alignItems: 'center',
+            alignItems: 'flex-end',
+            backgroundColor: 'var(--bg-surface)',
+            borderRadius: 24,
+            padding: '4px 6px',
             border: '1px solid var(--border-color)',
+            minHeight: 44,
           }}
         >
+          {/* Emoji Button */}
+          <button
+            type="button"
+            onClick={() => {
+              setShowEmoji(!showEmoji)
+              setShowAttachment(false)
+            }}
+            className="btn-icon"
+            title="Emoji"
+            style={{
+              width: 36,
+              height: 36,
+              flexShrink: 0,
+              color: 'var(--text-muted)',
+            }}
+          >
+            <Smile size={22} />
+          </button>
+
+          {/* Text Area */}
           <textarea
             ref={textareaRef}
             rows={1}
@@ -265,20 +250,59 @@ export const MessageInput = ({
             onKeyDown={handleKeyDown}
             placeholder="Type a message..."
             style={{
-              width: '100%',
+              flex: 1,
               resize: 'none',
               maxHeight: 120,
-              fontSize: 'var(--font-size-base)',
+              fontSize: '15px',
               color: 'var(--text-primary)',
-              lineHeight: 1.4,
+              lineHeight: 1.45,
               backgroundColor: 'transparent',
               border: 'none',
               outline: 'none',
+              padding: '7px 2px',
+              margin: 0,
+              fontFamily: 'inherit',
             }}
           />
+
+          {/* Attachment Button */}
+          <button
+            type="button"
+            onClick={() => {
+              setShowAttachment(!showAttachment)
+              setShowEmoji(false)
+            }}
+            className="btn-icon"
+            title="Attach files"
+            style={{
+              width: 36,
+              height: 36,
+              flexShrink: 0,
+              color: 'var(--text-muted)',
+              transform: 'rotate(-45deg)',
+            }}
+          >
+            <Paperclip size={21} />
+          </button>
+
+          {/* Direct Camera Button */}
+          <button
+            type="button"
+            onClick={() => cameraInputRef.current?.click()}
+            className="btn-icon"
+            title="Camera"
+            style={{
+              width: 36,
+              height: 36,
+              flexShrink: 0,
+              color: 'var(--text-muted)',
+            }}
+          >
+            <Camera size={21} />
+          </button>
         </div>
 
-        {/* Send Button (WhatsApp circular teal style) */}
+        {/* Send Button (WhatsApp circular teal — outside the input field) */}
         <button
           type="button"
           onClick={handleSend}
@@ -296,7 +320,7 @@ export const MessageInput = ({
             cursor: (!text.trim() && !selectedFile) ? 'default' : 'pointer',
             opacity: (!text.trim() && !selectedFile) ? 0.45 : 1,
             boxShadow: (!text.trim() && !selectedFile) ? 'none' : '0 3px 10px rgba(0, 168, 132, 0.4)',
-            transition: 'transform 0.15s ease, background-color 0.15s ease, opacity 0.15s ease',
+            transition: 'transform 0.15s ease, opacity 0.15s ease',
             flexShrink: 0,
           }}
           onMouseEnter={(e) => {

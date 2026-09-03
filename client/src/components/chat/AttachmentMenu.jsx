@@ -121,8 +121,8 @@ export const AttachmentMenu = ({ onSelectFile, onClose }) => {
       className="animate-slide-up"
       style={{
         position: 'absolute',
-        bottom: 'calc(var(--input-area-height, 56px) + 8px)',
-        left: 56,
+        bottom: 'calc(var(--input-area-height, 52px) + 8px)',
+        right: 56,
         backgroundColor: 'var(--bg-surface)',
         borderRadius: 'var(--radius-lg)',
         boxShadow: 'var(--shadow-popup)',

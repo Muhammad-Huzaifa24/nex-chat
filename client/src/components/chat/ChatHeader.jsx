@@ -203,22 +203,27 @@ export const ChatHeader = ({
 
         {/* Header Actions */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          {/* Video Call Button */}
-          <button
-            onClick={() => handleCallOption('video')}
-            className="btn-icon"
-            title="Video call"
-          >
-            <Video size={19} />
-          </button>
-
-          {/* Phone Call Button (opens call drawer) */}
+          {/* Phone+ Call Button (opens call drawer) */}
           <button
             onClick={() => setShowCallDrawer(true)}
             className="btn-icon"
-            title="Voice or video call"
+            title="Start call"
+            style={{ position: 'relative' }}
           >
-            <Phone size={18} />
+            <svg
+              width="21"
+              height="21"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+              <line x1="19" y1="2" x2="19" y2="8" />
+              <line x1="16" y1="5" x2="22" y2="5" />
+            </svg>
           </button>
 
           {/* More Menu Dropdown */}
@@ -318,28 +323,30 @@ export const ChatHeader = ({
         onClose={() => setShowCallDrawer(false)}
         title="Select call type"
       >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <button
             onClick={() => handleCallOption('audio')}
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: 16,
-              padding: '14px 16px',
+              justifyContent: 'flex-start',
+              gap: 20,
+              padding: '12px 8px',
               backgroundColor: 'transparent',
               border: 'none',
               borderRadius: 'var(--radius-md)',
               color: 'var(--text-primary)',
-              fontSize: 'var(--font-size-base)',
-              fontWeight: 500,
+              fontSize: '16px',
+              fontWeight: 400,
               cursor: 'pointer',
               textAlign: 'left',
+              width: '100%',
             }}
             onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--bg-surface-hover)')}
             onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
           >
-            <Phone size={22} color="var(--primary-color)" />
-            <span>Voice call</span>
+            <Phone size={22} style={{ color: 'var(--text-secondary, #8696a0)', flexShrink: 0 }} />
+            <span style={{ textAlign: 'left' }}>Voice call</span>
           </button>
 
           <button
@@ -347,22 +354,24 @@ export const ChatHeader = ({
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: 16,
-              padding: '14px 16px',
+              justifyContent: 'flex-start',
+              gap: 20,
+              padding: '12px 8px',
               backgroundColor: 'transparent',
               border: 'none',
               borderRadius: 'var(--radius-md)',
               color: 'var(--text-primary)',
-              fontSize: 'var(--font-size-base)',
-              fontWeight: 500,
+              fontSize: '16px',
+              fontWeight: 400,
               cursor: 'pointer',
               textAlign: 'left',
+              width: '100%',
             }}
             onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--bg-surface-hover)')}
             onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
           >
-            <Video size={22} color="var(--primary-color)" />
-            <span>Video call</span>
+            <Video size={22} style={{ color: 'var(--text-secondary, #8696a0)', flexShrink: 0 }} />
+            <span style={{ textAlign: 'left' }}>Video call</span>
           </button>
         </div>
       </BottomDrawer>

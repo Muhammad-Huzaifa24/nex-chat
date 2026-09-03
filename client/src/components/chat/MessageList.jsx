@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react'
 import { MessageBubble } from './MessageBubble'
 import { ChevronDown } from 'lucide-react'
+import { MessageListSkeleton } from '../ui/Skeleton'
 
 export const MessageList = ({
   messages = [],
@@ -163,7 +164,9 @@ export const MessageList = ({
           flexDirection: 'column',
         }}
       >
-        {isLoading && (
+        {isLoading && messages.length === 0 && <MessageListSkeleton />}
+
+        {isLoading && messages.length > 0 && (
           <div
             style={{
               display: 'flex',

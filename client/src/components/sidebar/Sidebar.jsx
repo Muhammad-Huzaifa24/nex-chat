@@ -6,6 +6,7 @@ import { Avatar } from '../ui/Avatar'
 import { SearchBar } from './SearchBar'
 import { ConversationItem } from './ConversationItem'
 import { SidebarFAB } from './SidebarFAB'
+import { ConversationSkeleton } from '../ui/Skeleton'
 import {
   LogOut,
   Settings,
@@ -53,6 +54,7 @@ export const Sidebar = ({ onOpenNewChat, onOpenNewGroup }) => {
     setActiveConversation,
     setActivePanel,
     typingUsers,
+    isLoading,
   } = useConversationStore()
 
   // Filter conversations by debounced search input
@@ -240,7 +242,13 @@ export const Sidebar = ({ onOpenNewChat, onOpenNewGroup }) => {
 
       {/* Conversation List */}
       <div style={{ flex: 1, overflowY: 'auto' }}>
-        {filteredConversations.length === 0 ? (
+        {isLoading && conversations.length === 0 ? (
+          <div>
+            {[1, 2, 3, 4, 5, 6].map((idx) => (
+              <ConversationSkeleton key={idx} />
+            ))}
+          </div>
+        ) : filteredConversations.length === 0 ? (
           <div
             style={{
               padding: '36px 16px',
