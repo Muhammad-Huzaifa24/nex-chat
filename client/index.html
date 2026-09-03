@@ -21,9 +21,11 @@
   <link rel="canonical" href="https://nex-chat-wjpg.vercel.app/" />
 
   <!-- Favicons & App Icons -->
+  <link rel="icon" href="/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-  <link rel="alternate icon" type="image/svg+xml" href="/favicon.svg" />
-  <link rel="apple-touch-icon" href="/favicon.svg" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
   <link rel="manifest" href="/site.webmanifest" />
 
   <!-- Open Graph / Facebook / WhatsApp / LinkedIn / Telegram -->
@@ -34,26 +36,49 @@
   <meta property="og:description"
     content="Connect instantly with anyone using shareable chat links. Real-time typing, voice notes, and seamless group messaging." />
   <meta property="og:image" content="https://nex-chat-wjpg.vercel.app/og-image.png" />
+  <meta property="og:image:alt" content="NexChat — Fast, Secure Real-Time Messaging" />
   <meta property="og:locale" content="en_US" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
   <meta property="og:image:type" content="image/png" />
+
   <!-- Twitter / X Cards -->
-  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:url" content="https://nex-chat-wjpg.vercel.app/" />
   <meta name="twitter:title" content="NexChat — Fast, Secure Real-Time Messaging" />
   <meta name="twitter:description"
     content="Connect instantly with anyone using shareable chat links. Real-time typing, voice notes, and seamless group messaging." />
   <meta name="twitter:image" content="https://nex-chat-wjpg.vercel.app/og-image.png" />
+  <meta name="twitter:image:alt" content="NexChat — Fast, Secure Real-Time Messaging" />
 
   <!-- Google Fonts Preconnect -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    .seo-crawler-heading {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+  </style>
 </head>
 
 <body>
-  <div id="root"></div>
+  <div id="root">
+    <!-- Accessible SEO fallback heading for search crawlers before client hydration -->
+    <header class="seo-crawler-heading">
+      <h1>NexChat — Fast, Secure Real-Time Messaging</h1>
+      <p>Experience instant, privacy-focused messaging. Connect with friends and communities via direct chat links, voice notes, rich media, and group messaging.</p>
+    </header>
+  </div>
   <script type="module" src="/src/main.jsx"></script>
 </body>
 

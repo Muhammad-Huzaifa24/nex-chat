@@ -146,9 +146,9 @@ export const VerifyEmailPage = () => {
           >
             <MessageSquare size={30} />
           </div>
-          <h2 style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
+          <h1 style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
             Verify Your Email
-          </h2>
+          </h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: '8px' }}>
             Enter the 6-digit code sent to
           </p>
