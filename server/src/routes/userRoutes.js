@@ -4,6 +4,7 @@ import {
   getUserById,
   updateProfile,
   updateAvatar,
+  deleteAvatar,
   heartbeat,
   setOffline,
   getPublicProfile,
@@ -25,6 +26,7 @@ router.post('/offline', setOffline)
 router.get('/:id', getUserById)
 router.put('/profile', updateProfile)
 router.put('/avatar', upload.single('avatar'), updateAvatar)
+router.delete('/avatar', deleteAvatar)
 
 export default router
 

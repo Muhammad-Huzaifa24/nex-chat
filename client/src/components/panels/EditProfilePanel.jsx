@@ -1,6 +1,21 @@
-import React, { useState } from 'react'
+import React, { useState, useRef } from 'react'
 import { Avatar } from '../ui/Avatar'
-import { ArrowLeft, X, Camera, Check, Loader2, User, Info, Phone, Mail, Share2, Copy, ExternalLink } from 'lucide-react'
+import {
+  ArrowLeft,
+  X,
+  Camera,
+  Check,
+  Loader2,
+  User,
+  Info,
+  Phone,
+  Mail,
+  Share2,
+  Copy,
+  ExternalLink,
+  Image,
+  Trash2,
+} from 'lucide-react'
 import api from '../../services/api'
 import { useAuthStore } from '../../store/authStore'
 import { useToastStore } from '../../store/toastStore'
@@ -14,6 +29,14 @@ export const EditProfilePanel = ({ onClose }) => {
   const [phone, setPhone] = useState(user?.phone || '')
   const [loading, setLoading] = useState(false)
   const [avatarLoading, setAvatarLoading] = useState(false)
+
+  // DP Change options & preview state
+  const [showAvatarMenu, setShowAvatarMenu] = useState(false)
+  const [previewFile, setPreviewFile] = useState(null)
+  const [previewUrl, setPreviewUrl] = useState(null)
+
+  const cameraInputRef = useRef(null)
+  const galleryInputRef = useRef(null)
 
   const handleSaveProfile = async () => {
     if (!displayName.trim()) {
@@ -33,22 +56,44 @@ export const EditProfilePanel = ({ onClose }) => {
     }
   }
 
-  const handleAvatarUpload = async (e) => {
-    const file = e.target.files[0]
+  const handleSelectFile = (file) => {
     if (!file) return
+    setShowAvatarMenu(false)
+    setPreviewFile(file)
+    setPreviewUrl(URL.createObjectURL(file))
+  }
+
+  const handleConfirmAvatarUpload = async () => {
+    if (!previewFile) return
 
     setAvatarLoading(true)
     const formData = new FormData()
-    formData.append('avatar', file)
+    formData.append('avatar', previewFile)
 
     try {
       const res = await api.put('/users/avatar', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       })
       updateUser(res.data.user)
-      addToast('Avatar updated', 'success')
+      addToast('Profile photo updated', 'success')
+      setPreviewFile(null)
+      setPreviewUrl(null)
     } catch (err) {
       addToast('Failed to upload avatar', 'error')
+    } finally {
+      setAvatarLoading(false)
+    }
+  }
+
+  const handleRemoveAvatar = async () => {
+    setShowAvatarMenu(false)
+    setAvatarLoading(true)
+    try {
+      const res = await api.delete('/users/avatar')
+      updateUser(res.data.user)
+      addToast('Profile photo removed', 'success')
+    } catch (err) {
+      addToast('Failed to remove photo', 'error')
     } finally {
       setAvatarLoading(false)
     }
@@ -68,53 +113,91 @@ export const EditProfilePanel = ({ onClose }) => {
           animation: 'slideRight 0.24s cubic-bezier(0.16, 1, 0.3, 1) forwards',
         }}
       >
-      {/* Header */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 12,
-          padding: '0 16px',
-          height: 'var(--header-height)',
-          backgroundColor: 'var(--bg-header)',
-          borderBottom: '1px solid var(--border-color)',
-          flexShrink: 0,
-        }}
-      >
-        <button onClick={onClose} className="btn-icon" style={{ width: 36, height: 36 }} title="Close Profile">
-          <ArrowLeft size={20} />
-        </button>
-        <span style={{ fontWeight: 600, fontSize: 'var(--font-size-md)', color: 'var(--text-primary)' }}>
-          Edit Profile
-        </span>
-      </div>
+        {/* Hidden Camera & Gallery Inputs */}
+        <input
+          type="file"
+          ref={cameraInputRef}
+          accept="image/*"
+          capture="environment"
+          style={{ display: 'none' }}
+          onChange={(e) => {
+            const f = e.target.files[0]
+            if (f) handleSelectFile(f)
+            e.target.value = ''
+          }}
+        />
+        <input
+          type="file"
+          ref={galleryInputRef}
+          accept="image/*"
+          style={{ display: 'none' }}
+          onChange={(e) => {
+            const f = e.target.files[0]
+            if (f) handleSelectFile(f)
+            e.target.value = ''
+          }}
+        />
 
-      {/* Body */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '24px 20px', display: 'flex', flexDirection: 'column', gap: 20 }}>
-        {/* Avatar change */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <label style={{ position: 'relative', cursor: 'pointer' }}>
-            <input type="file" accept="image/*" onChange={handleAvatarUpload} style={{ display: 'none' }} />
-            <Avatar src={user?.avatar} name={user?.displayName} size="xl" />
-            <div
-              style={{
-                position: 'absolute',
-                inset: 0,
-                backgroundColor: 'rgba(0,0,0,0.4)',
-                borderRadius: 'var(--radius-full)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'white',
-              }}
-            >
-              {avatarLoading ? <Loader2 size={24} className="animate-spin" /> : <Camera size={24} />}
-            </div>
-          </label>
-          <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)', marginTop: 8 }}>
-            Click photo to change avatar
+        {/* Header */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            padding: '0 16px',
+            height: 'var(--header-height, 60px)',
+            backgroundColor: 'var(--bg-header)',
+            borderBottom: '1px solid var(--border-color)',
+            flexShrink: 0,
+          }}
+        >
+          <button onClick={onClose} className="btn-icon" style={{ width: 36, height: 36 }} title="Close Profile">
+            <ArrowLeft size={20} />
+          </button>
+          <span style={{ fontWeight: 600, fontSize: 'var(--font-size-md)', color: 'var(--text-primary)' }}>
+            Edit Profile
           </span>
         </div>
+
+        {/* Body */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '24px 20px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {/* Avatar change with interactive overlay */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <div
+              onClick={() => setShowAvatarMenu(true)}
+              style={{ position: 'relative', cursor: 'pointer' }}
+              title="Change profile photo"
+            >
+              <Avatar src={user?.avatar} name={user?.displayName} size="xl" />
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  backgroundColor: 'rgba(0,0,0,0.45)',
+                  borderRadius: 'var(--radius-full)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white',
+                  transition: 'background-color 0.2s ease',
+                }}
+              >
+                {avatarLoading ? <Loader2 size={26} className="animate-spin" /> : <Camera size={24} />}
+              </div>
+            </div>
+            <span
+              onClick={() => setShowAvatarMenu(true)}
+              style={{
+                fontSize: 'var(--font-size-xs)',
+                color: 'var(--primary-color)',
+                marginTop: 8,
+                cursor: 'pointer',
+                fontWeight: 500,
+              }}
+            >
+              Change profile photo
+            </span>
+          </div>
 
         {/* Display Name */}
         <div>
@@ -352,6 +435,209 @@ export const EditProfilePanel = ({ onClose }) => {
         </button>
       </div>
       </div>
+
+      {/* Avatar Options Modal/Drawer */}
+      {showAvatarMenu && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'flex-end',
+            justifyContent: 'center',
+          }}
+        >
+          <div
+            onClick={() => setShowAvatarMenu(false)}
+            style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)' }}
+          />
+          <div
+            className="animate-slide-up"
+            style={{
+              position: 'relative',
+              backgroundColor: 'var(--bg-surface)',
+              borderTopLeftRadius: 20,
+              borderTopRightRadius: 20,
+              padding: '16px 20px 28px',
+              width: '100%',
+              maxWidth: 480,
+              border: '1px solid var(--border-color)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 8,
+            }}
+          >
+            <div style={{ width: 40, height: 4, backgroundColor: 'var(--text-muted)', borderRadius: 999, margin: '0 auto 12px', opacity: 0.6 }} />
+            <h3 style={{ fontSize: 'var(--font-size-base)', fontWeight: 600, margin: '0 0 10px 0', color: 'var(--text-primary)' }}>
+              Profile photo
+            </h3>
+
+            <button
+              onClick={() => {
+                setShowAvatarMenu(false)
+                cameraInputRef.current?.click()
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 14,
+                padding: '12px 14px',
+                borderRadius: 'var(--radius-md)',
+                border: 'none',
+                backgroundColor: 'transparent',
+                color: 'var(--text-primary)',
+                fontSize: 'var(--font-size-sm)',
+                fontWeight: 500,
+                cursor: 'pointer',
+                textAlign: 'left',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--bg-surface-hover)')}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+            >
+              <Camera size={20} color="var(--primary-color)" />
+              <span>Take photo</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setShowAvatarMenu(false)
+                galleryInputRef.current?.click()
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 14,
+                padding: '12px 14px',
+                borderRadius: 'var(--radius-md)',
+                border: 'none',
+                backgroundColor: 'transparent',
+                color: 'var(--text-primary)',
+                fontSize: 'var(--font-size-sm)',
+                fontWeight: 500,
+                cursor: 'pointer',
+                textAlign: 'left',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--bg-surface-hover)')}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+            >
+              <Image size={20} color="#ac44cf" />
+              <span>Choose from gallery</span>
+            </button>
+
+            {user?.avatar && (
+              <button
+                onClick={handleRemoveAvatar}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 14,
+                  padding: '12px 14px',
+                  borderRadius: 'var(--radius-md)',
+                  border: 'none',
+                  backgroundColor: 'transparent',
+                  color: 'var(--accent-red)',
+                  fontSize: 'var(--font-size-sm)',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  borderTop: '1px solid var(--border-subtle)',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--bg-surface-hover)')}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+              >
+                <Trash2 size={20} color="var(--accent-red)" />
+                <span>Remove photo</span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Photo Preview Modal before Saving */}
+      {previewUrl && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 10000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 20,
+          }}
+        >
+          <div
+            onClick={() => {
+              setPreviewUrl(null)
+              setPreviewFile(null)
+            }}
+            style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.75)' }}
+          />
+          <div
+            className="animate-scale-up"
+            style={{
+              position: 'relative',
+              backgroundColor: 'var(--bg-surface)',
+              borderRadius: 'var(--radius-lg)',
+              padding: '24px',
+              maxWidth: 380,
+              width: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              boxShadow: 'var(--shadow-popup)',
+              border: '1px solid var(--border-color)',
+            }}
+          >
+            <h3 style={{ fontSize: 'var(--font-size-base)', fontWeight: 600, margin: '0 0 16px 0', color: 'var(--text-primary)' }}>
+              Set Profile Photo
+            </h3>
+
+            <div
+              style={{
+                width: 200,
+                height: 200,
+                borderRadius: '50%',
+                overflow: 'hidden',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.35)',
+                border: '3px solid var(--primary-color)',
+                marginBottom: 20,
+              }}
+            >
+              <img
+                src={previewUrl}
+                alt="Avatar preview"
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: 12, width: '100%' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setPreviewUrl(null)
+                  setPreviewFile(null)
+                }}
+                disabled={avatarLoading}
+                className="btn-secondary"
+                style={{ flex: 1, padding: '10px' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmAvatarUpload}
+                disabled={avatarLoading}
+                className="btn-primary"
+                style={{ flex: 1, padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+              >
+                {avatarLoading ? <Loader2 size={16} className="animate-spin" /> : 'Set Photo'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }

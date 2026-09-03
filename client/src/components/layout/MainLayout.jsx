@@ -13,6 +13,8 @@ import { useMessageStore } from '../../store/messageStore'
 import { getSocket } from '../../socket/socket'
 import { subscribeChannel, unsubscribeChannel } from '../../socket/pusher'
 import api from '../../services/api'
+import { playNotificationSound } from '../../utils/sound'
+import { useSettingsStore } from '../../store/settingsStore'
 
 export const MainLayout = () => {
   const { user, token } = useAuthStore()
@@ -53,19 +55,61 @@ export const MainLayout = () => {
     }
   }, [])
 
-  // Helper to trigger native Push Notification when tab is hidden or minimized
-  const triggerPushNotification = (senderName, content, avatar) => {
-    if (document.visibilityState !== 'hidden') return
+  // Auto-open direct chat from URL parameters (?user=username or ?c=conversationId)
+  useEffect(() => {
+    if (!token) return
+    const params = new URLSearchParams(window.location.search)
+    const targetUsername = params.get('user')
+    const targetConvId = params.get('c')
+
+    if (targetUsername) {
+      api.post(`/conversations/direct/user/${targetUsername}`).then((res) => {
+        if (res.data.success && res.data.conversation) {
+          addOrUpdateConversation(res.data.conversation)
+          setActiveConversation(res.data.conversation)
+          window.history.replaceState({}, '', '/')
+        }
+      }).catch(() => {})
+    } else if (targetConvId) {
+      const found = useConversationStore.getState().conversations.find((c) => c._id === targetConvId)
+      if (found) {
+        setActiveConversation(found)
+        window.history.replaceState({}, '', '/')
+      }
+    }
+  }, [token])
+
+  // Helper to trigger native Push Notification and audio tone
+  const triggerPushNotification = (senderName, content, avatar, conversationId) => {
+    const { soundEnabled, pushEnabled } = useSettingsStore.getState()
+
+    // 1. Play pleasant audio pop tone if enabled in settings
+    if (soundEnabled) {
+      playNotificationSound()
+    }
+
+    // 2. Dispatch system push notification if enabled
+    if (!pushEnabled) return
+
+    const currentActiveId = useConversationStore.getState().activeConversation?._id
+    const isAppFocused = document.visibilityState === 'visible' && document.hasFocus()
+    // Don't show system popup banner if user is actively chatting inside this conversation
+    if (isAppFocused && currentActiveId === conversationId) return
+
     if (!('Notification' in window) || Notification.permission !== 'granted') return
 
     const title = senderName ? `${senderName} on NexChat` : 'New message on NexChat'
     const options = {
       body: content || 'Sent an attachment',
-      icon: avatar || '/favicon.ico',
-      badge: '/favicon.ico',
+      icon: avatar || '/icon-192.png',
+      badge: '/icon-192.png',
       vibrate: [100, 50, 100],
-      tag: 'nexchat-msg',
+      tag: `nexchat-${conversationId || 'msg'}`,
       renotify: true,
+      data: {
+        url: conversationId ? `/?c=${conversationId}` : '/',
+        conversationId,
+      },
     }
 
     if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
@@ -304,7 +348,7 @@ export const MainLayout = () => {
           }
           const senderName = message.senderId?.displayName || message.senderId?.username || 'New message'
           const previewText = message.content || (message.type === 'image' ? '📷 Photo' : '📎 Attachment')
-          triggerPushNotification(senderName, previewText, message.senderId?.avatar)
+          triggerPushNotification(senderName, previewText, message.senderId?.avatar, conversationId)
         }
       })
 
@@ -351,7 +395,7 @@ export const MainLayout = () => {
     <div
       style={{
         display: 'flex',
-        height: '100vh',
+        height: '100dvh',
         width: '100vw',
         overflow: 'hidden',
         position: 'relative',

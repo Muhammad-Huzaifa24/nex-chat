@@ -7,6 +7,7 @@ import { RegisterPage } from './pages/RegisterPage'
 import { VerifyEmailPage } from './pages/VerifyEmailPage'
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage'
 import { DirectChatRedirect } from './pages/DirectChatRedirect'
+import { SettingsPage } from './pages/SettingsPage'
 import { MainLayout } from './components/layout/MainLayout'
 import { ToastContainer } from './components/ui/Toast'
 import { Loader2 } from 'lucide-react'
@@ -107,6 +108,14 @@ export default function App() {
         />
         <Route path="/u/:username" element={<DirectChatRedirect />} />
         <Route path="/chat/:username" element={<DirectChatRedirect />} />
+        <Route
+          path="/settings"
+          element={
+            <ProtectedRoute>
+              <SettingsPage />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/"
           element={

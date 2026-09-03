@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { Smile, Paperclip, Send, X, Loader2 } from 'lucide-react'
+import { Smile, Paperclip, SendHorizonal, Camera, X } from 'lucide-react'
 import { EmojiPicker } from './EmojiPicker'
 import { AttachmentMenu } from './AttachmentMenu'
 import { ReplyPreview } from './ReplyPreview'
+import { useDraftStore } from '../../store/draftStore'
 
 export const MessageInput = ({
   activeConversationId,
@@ -19,8 +20,19 @@ export const MessageInput = ({
   const [fileType, setFileType] = useState('text')
 
   const textareaRef = useRef(null)
+  const cameraInputRef = useRef(null)
   const typingTimerRef = useRef(null)
   const isTypingRef = useRef(false)
+
+  // Load persistent draft when switching conversation
+  useEffect(() => {
+    if (activeConversationId) {
+      const savedDraft = useDraftStore.getState().getDraft(activeConversationId)
+      setText(savedDraft || '')
+    } else {
+      setText('')
+    }
+  }, [activeConversationId])
 
   // Auto-focus textarea on conversation change and tab switch / window focus
   useEffect(() => {
@@ -56,7 +68,11 @@ export const MessageInput = ({
   }, [text])
 
   const handleTextChange = (e) => {
-    setText(e.target.value)
+    const val = e.target.value
+    setText(val)
+    if (activeConversationId) {
+      useDraftStore.getState().setDraft(activeConversationId, val)
+    }
 
     // Trigger typing:start only ONCE when typing begins
     if (!isTypingRef.current) {
@@ -87,7 +103,6 @@ export const MessageInput = ({
     }, 50)
   }
 
-  // Remove isSending blocking state to allow rapid non-blocking message sends
   const handleSend = () => {
     const trimmedText = text.trim()
     if (!trimmedText && !selectedFile) return
@@ -97,6 +112,11 @@ export const MessageInput = ({
       file: selectedFile,
       type: selectedFile ? fileType : 'text',
       replyTo: replyingTo?._id,
+    }
+
+    // Clear draft in store
+    if (activeConversationId) {
+      useDraftStore.getState().clearDraft(activeConversationId)
     }
 
     // Immediately clear input fields so user can type the next message instantly
@@ -130,8 +150,23 @@ export const MessageInput = ({
         borderTop: '1px solid var(--border-color)',
         position: 'relative',
         zIndex: 20,
+        flexShrink: 0,
       }}
     >
+      {/* Hidden Camera Input with native environment capture */}
+      <input
+        type="file"
+        ref={cameraInputRef}
+        accept="image/*"
+        capture="environment"
+        style={{ display: 'none' }}
+        onChange={(e) => {
+          const file = e.target.files[0]
+          if (file) handleFileSelect(file, 'image')
+          e.target.value = ''
+        }}
+      />
+
       {/* Reply Preview */}
       {replyingTo && <ReplyPreview replyMessage={replyingTo} onCancel={onCancelReply} />}
 
@@ -171,7 +206,7 @@ export const MessageInput = ({
           alignItems: 'flex-end',
           padding: '8px 12px',
           gap: 8,
-          minHeight: 'var(--input-area-height)',
+          minHeight: 'var(--input-area-height, 56px)',
         }}
       >
         {/* Emoji Button */}
@@ -195,9 +230,19 @@ export const MessageInput = ({
             setShowEmoji(false)
           }}
           className="btn-icon"
-          title="Attach"
+          title="Attach files"
         >
           <Paperclip size={22} />
+        </button>
+
+        {/* Direct Camera Button (Mobile camera capture) */}
+        <button
+          type="button"
+          onClick={() => cameraInputRef.current?.click()}
+          className="btn-icon"
+          title="Camera"
+        >
+          <Camera size={22} />
         </button>
 
         {/* Text Area */}
@@ -226,30 +271,43 @@ export const MessageInput = ({
               fontSize: 'var(--font-size-base)',
               color: 'var(--text-primary)',
               lineHeight: 1.4,
+              backgroundColor: 'transparent',
+              border: 'none',
+              outline: 'none',
             }}
           />
         </div>
 
-        {/* Send Button */}
+        {/* Send Button (WhatsApp circular teal style) */}
         <button
           type="button"
           onClick={handleSend}
           disabled={!text.trim() && !selectedFile}
-          className="btn-primary"
           style={{
-            width: 42,
-            height: 42,
-            borderRadius: 'var(--radius-full)',
-            padding: 0,
+            width: 44,
+            height: 44,
+            borderRadius: '50%',
+            backgroundColor: 'var(--primary-color)',
+            color: '#ffffff',
+            border: 'none',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            opacity: (!text.trim() && !selectedFile) ? 0.6 : 1,
             cursor: (!text.trim() && !selectedFile) ? 'default' : 'pointer',
+            opacity: (!text.trim() && !selectedFile) ? 0.45 : 1,
+            boxShadow: (!text.trim() && !selectedFile) ? 'none' : '0 3px 10px rgba(0, 168, 132, 0.4)',
+            transition: 'transform 0.15s ease, background-color 0.15s ease, opacity 0.15s ease',
+            flexShrink: 0,
+          }}
+          onMouseEnter={(e) => {
+            if (text.trim() || selectedFile) e.currentTarget.style.transform = 'scale(1.06)'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'scale(1)'
           }}
           title="Send message"
         >
-          <Send size={18} />
+          <SendHorizonal size={20} />
         </button>
       </div>
 
@@ -257,7 +315,11 @@ export const MessageInput = ({
       {showEmoji && (
         <EmojiPicker
           onEmojiSelect={(emoji) => {
-            setText((prev) => prev + emoji)
+            const newText = text + emoji
+            setText(newText)
+            if (activeConversationId) {
+              useDraftStore.getState().setDraft(activeConversationId, newText)
+            }
             textareaRef.current?.focus()
           }}
           onClose={() => setShowEmoji(false)}

@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react'
-import { Image, Video, Music, FileText } from 'lucide-react'
+import { Image, Video, Music, FileText, Camera } from 'lucide-react'
 import { useToastStore } from '../../store/toastStore'
 
 // Standard size thresholds in MB
@@ -14,6 +14,7 @@ export const AttachmentMenu = ({ onSelectFile, onClose }) => {
   const menuRef = useRef(null)
   const addToast = useToastStore((state) => state.addToast)
 
+  const cameraInputRef = useRef(null)
   const imageInputRef = useRef(null)
   const videoInputRef = useRef(null)
   const audioInputRef = useRef(null)
@@ -67,6 +68,16 @@ export const AttachmentMenu = ({ onSelectFile, onClose }) => {
 
   const items = [
     {
+      label: 'Camera',
+      subtext: 'Take photo',
+      icon: Camera,
+      color: '#00a884',
+      ref: cameraInputRef,
+      accept: 'image/*',
+      capture: 'environment',
+      type: 'image',
+    },
+    {
       label: 'Photos',
       subtext: 'Max 15MB',
       icon: Image,
@@ -110,7 +121,7 @@ export const AttachmentMenu = ({ onSelectFile, onClose }) => {
       className="animate-slide-up"
       style={{
         position: 'absolute',
-        bottom: 'calc(var(--input-area-height) + 8px)',
+        bottom: 'calc(var(--input-area-height, 56px) + 8px)',
         left: 56,
         backgroundColor: 'var(--bg-surface)',
         borderRadius: 'var(--radius-lg)',
@@ -132,6 +143,7 @@ export const AttachmentMenu = ({ onSelectFile, onClose }) => {
               type="file"
               ref={item.ref}
               accept={item.accept}
+              capture={item.capture || undefined}
               style={{ display: 'none' }}
               onChange={(e) => handleFileChange(e, item.type)}
             />

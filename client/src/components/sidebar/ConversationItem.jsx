@@ -1,6 +1,7 @@
 import React from 'react'
 import { Avatar } from '../ui/Avatar'
 import { Check, CheckCheck, Users } from 'lucide-react'
+import { useDraftStore } from '../../store/draftStore'
 
 export const ConversationItem = ({
   conversation,
@@ -10,9 +11,12 @@ export const ConversationItem = ({
   isTyping,
   typingText,
 }) => {
+  const draft = useDraftStore((state) => state.drafts[conversation._id])
+  const hasDraft = Boolean(draft && draft.trim())
+
   // Get other participant for 1-to-1 chats
   const otherParticipant = !conversation.isGroup
-    ? conversation.participants?.find((p) => p._id !== currentUserId)
+    ? conversation.participants?.find((p) => (p._id?.toString() || p.toString()) !== currentUserId?.toString())
     : null
 
   const title = conversation.isGroup
@@ -41,6 +45,15 @@ export const ConversationItem = ({
 
   // Last message preview text
   const getLastMessagePreview = () => {
+    if (hasDraft) {
+      return (
+        <span>
+          <span style={{ color: 'var(--status-online, #25d366)', fontWeight: 600 }}>Draft: </span>
+          <span>{draft}</span>
+        </span>
+      )
+    }
+
     if (isTyping) {
       return <span style={{ color: 'var(--primary-color)', fontWeight: 500 }}>{typingText || 'typing...'}</span>
     }
@@ -68,6 +81,12 @@ export const ConversationItem = ({
 
     return `${prefix}${lastMsg.content || ''}`
   }
+
+  // Unread count
+  const unreadCount =
+    conversation.unreadCounts?.get?.(currentUserId) ||
+    conversation.unreadCounts?.[currentUserId] ||
+    0
 
   return (
     <div
@@ -127,10 +146,13 @@ export const ConversationItem = ({
               display: 'flex',
               alignItems: 'center',
               gap: 4,
+              flex: 1,
+              minWidth: 0,
             }}
           >
-            {/* Status tick if current user was sender */}
-            {conversation.lastMessage &&
+            {/* Status tick if current user was sender and no draft */}
+            {!hasDraft &&
+              conversation.lastMessage &&
               conversation.lastMessage.senderId?._id === currentUserId &&
               !isTyping && (
                 <span>
@@ -147,6 +169,29 @@ export const ConversationItem = ({
               {getLastMessagePreview()}
             </span>
           </div>
+
+          {/* WhatsApp Unread Pill Badge */}
+          {unreadCount > 0 && !isActive && (
+            <div
+              style={{
+                backgroundColor: 'var(--status-online, #25d366)',
+                color: '#ffffff',
+                fontSize: '11px',
+                fontWeight: 700,
+                minWidth: 18,
+                height: 18,
+                borderRadius: 9,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '0 5px',
+                marginLeft: 8,
+                flexShrink: 0,
+              }}
+            >
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </div>
+          )}
         </div>
       </div>
     </div>
