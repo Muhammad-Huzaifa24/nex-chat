@@ -8,11 +8,13 @@ import { useAuthStore } from '../../store/authStore'
 import { useConversationStore } from '../../store/conversationStore'
 import { useMessageStore } from '../../store/messageStore'
 import { useToastStore } from '../../store/toastStore'
+import { useSettingsStore } from '../../store/settingsStore'
 import api from '../../services/api'
 import { getSocket } from '../../socket/socket'
 
 export const ChatArea = ({ onBack, onImageClick }) => {
   const { user, token } = useAuthStore()
+  const { wallpaper } = useSettingsStore()
   const {
     activeConversation,
     setActivePanel,
@@ -247,16 +249,50 @@ export const ChatArea = ({ onBack, onImageClick }) => {
     }
   }
 
+  const getWallpaperBackground = () => {
+    switch (wallpaper) {
+      case 'whatsapp':
+        return {
+          backgroundColor: '#0c1317',
+          backgroundImage: 'radial-gradient(#1e293b 1px, transparent 1px)',
+          backgroundSize: '24px 24px',
+        }
+      case 'midnight':
+        return {
+          backgroundColor: '#0f172a',
+          backgroundImage: 'none',
+        }
+      case 'emerald':
+        return {
+          backgroundColor: '#062820',
+          backgroundImage: 'radial-gradient(#0c4a3b 1px, transparent 1px)',
+          backgroundSize: '24px 24px',
+        }
+      case 'charcoal':
+        return {
+          backgroundColor: '#18181b',
+          backgroundImage: 'none',
+        }
+      default:
+        return {
+          backgroundColor: 'var(--bg-chat)',
+          backgroundImage: 'var(--bg-chat-pattern)',
+          backgroundSize: '20px 20px',
+        }
+    }
+  }
+
   return (
     <div
       style={{
         display: 'flex',
         flexDirection: 'column',
         height: '100%',
+        maxHeight: '100%',
         width: '100%',
-        backgroundColor: 'var(--bg-chat)',
-        backgroundImage: 'var(--bg-chat-pattern)',
-        backgroundSize: '20px 20px',
+        overflow: 'hidden',
+        position: 'relative',
+        ...getWallpaperBackground(),
       }}
     >
       <ChatHeader

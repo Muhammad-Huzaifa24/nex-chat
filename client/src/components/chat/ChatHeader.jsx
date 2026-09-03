@@ -1,6 +1,17 @@
-import React from 'react'
+import React, { useState, useRef, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Avatar } from '../ui/Avatar'
-import { ArrowLeft, MoreVertical, Search } from 'lucide-react'
+import {
+  ArrowLeft,
+  MoreVertical,
+  Phone,
+  Video,
+  Info,
+  Trash2,
+  X,
+} from 'lucide-react'
+import { BottomDrawer } from '../ui/BottomDrawer'
+import { useToastStore } from '../../store/toastStore'
 
 export const ChatHeader = ({
   conversation,
@@ -9,8 +20,41 @@ export const ChatHeader = ({
   onOpenInfo,
   typingUsers,
 }) => {
+  const navigate = useNavigate()
+  const { addToast } = useToastStore()
+
+  const [showMenu, setShowMenu] = useState(false)
+  const [showCallDrawer, setShowCallDrawer] = useState(false)
+  const menuRef = useRef(null)
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setShowMenu(false)
+      }
+    }
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setShowMenu(false)
+      }
+    }
+
+    if (showMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+      document.addEventListener('touchstart', handleClickOutside)
+      document.addEventListener('keydown', handleKeyDown)
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('touchstart', handleClickOutside)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [showMenu])
+
   const otherParticipant = !conversation.isGroup
-    ? conversation.participants?.find((p) => p._id !== currentUserId)
+    ? conversation.participants?.find(
+        (p) => (p?._id?.toString() || p?.toString()) !== currentUserId?.toString()
+      )
     : null
 
   const title = conversation.isGroup
@@ -86,72 +130,242 @@ export const ChatHeader = ({
     return 'offline'
   }
 
-  return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '10px 16px',
-        height: 'var(--header-height)',
-        backgroundColor: 'var(--bg-header)',
-        borderBottom: '1px solid var(--border-color)',
-        zIndex: 10,
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
-        {/* Mobile Back button */}
-        {onBack && (
-          <button
-            onClick={onBack}
-            className="btn-icon"
-            style={{ marginRight: -4 }}
-          >
-            <ArrowLeft size={20} />
-          </button>
-        )}
+  const handleCallOption = (type) => {
+    setShowCallDrawer(false)
+    addToast(`${type === 'video' ? 'Video' : 'Voice'} call connecting...`, 'info', 3000)
+  }
 
-        {/* Avatar & Title (clickable to open info panel) */}
-        <div
-          onClick={onOpenInfo}
-          style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', minWidth: 0 }}
-        >
-          <Avatar
-            src={avatarSrc}
-            name={title}
-            size="sm"
-            isOnline={isOnline}
-          />
-          <div style={{ minWidth: 0 }}>
-            <h3
-              style={{
-                fontSize: 'var(--font-size-base)',
-                fontWeight: 600,
-                color: 'var(--text-primary)',
-              }}
-              className="truncate"
+  return (
+    <>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '10px 16px',
+          height: 'var(--header-height, 60px)',
+          backgroundColor: 'var(--bg-header)',
+          borderBottom: '1px solid var(--border-color)',
+          position: 'sticky',
+          top: 0,
+          zIndex: 30,
+          flexShrink: 0,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+          {/* Mobile Back button */}
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="btn-icon"
+              style={{ marginRight: -4 }}
+              title="Back"
             >
-              {title}
-            </h3>
-            <div
-              style={{
-                fontSize: 'var(--font-size-xs)',
-                color: 'var(--text-secondary)',
-              }}
-              className="truncate"
-            >
-              {getSubtitle()}
+              <ArrowLeft size={20} />
+            </button>
+          )}
+
+          {/* Avatar & Title (clickable to open info panel) */}
+          <div
+            onClick={onOpenInfo}
+            style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', minWidth: 0 }}
+          >
+            <Avatar
+              src={avatarSrc}
+              name={title}
+              size="sm"
+              isOnline={isOnline}
+            />
+            <div style={{ minWidth: 0 }}>
+              <h3
+                style={{
+                  fontSize: 'var(--font-size-base)',
+                  fontWeight: 600,
+                  color: 'var(--text-primary)',
+                  margin: 0,
+                }}
+                className="truncate"
+              >
+                {title}
+              </h3>
+              <div
+                style={{
+                  fontSize: 'var(--font-size-xs)',
+                  color: 'var(--text-secondary)',
+                }}
+                className="truncate"
+              >
+                {getSubtitle()}
+              </div>
             </div>
+          </div>
+        </div>
+
+        {/* Header Actions */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          {/* Video Call Button */}
+          <button
+            onClick={() => handleCallOption('video')}
+            className="btn-icon"
+            title="Video call"
+          >
+            <Video size={19} />
+          </button>
+
+          {/* Phone Call Button (opens call drawer) */}
+          <button
+            onClick={() => setShowCallDrawer(true)}
+            className="btn-icon"
+            title="Voice or video call"
+          >
+            <Phone size={18} />
+          </button>
+
+          {/* More Menu Dropdown */}
+          <div style={{ position: 'relative' }} ref={menuRef}>
+            <button
+              onClick={() => setShowMenu(!showMenu)}
+              className="btn-icon"
+              title="More options"
+            >
+              <MoreVertical size={20} />
+            </button>
+
+            {showMenu && (
+              <div
+                className="animate-scale-up"
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  right: 0,
+                  marginTop: 6,
+                  backgroundColor: 'var(--bg-surface)',
+                  borderRadius: 'var(--radius-md, 8px)',
+                  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.4)',
+                  border: '1px solid var(--border-color)',
+                  width: 185,
+                  padding: '6px 0',
+                  zIndex: 60,
+                  overflow: 'hidden',
+                  display: 'flex',
+                  flexDirection: 'column',
+                }}
+              >
+                <button
+                  onClick={() => {
+                    setShowMenu(false)
+                    onOpenInfo()
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'flex-start',
+                    gap: 14,
+                    width: '100%',
+                    padding: '10px 20px',
+                    fontSize: '14.5px',
+                    color: 'var(--text-primary)',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    lineHeight: 1.4,
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--bg-surface-hover)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                >
+                  <Info size={18} style={{ flexShrink: 0, color: 'var(--text-secondary)' }} />
+                  <span style={{ textAlign: 'left' }}>{conversation.isGroup ? 'Group info' : 'Contact info'}</span>
+                </button>
+
+                {onBack && (
+                  <button
+                    onClick={() => {
+                      setShowMenu(false)
+                      onBack()
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'flex-start',
+                      gap: 14,
+                      width: '100%',
+                      padding: '10px 20px',
+                      fontSize: '14.5px',
+                      color: 'var(--text-primary)',
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      lineHeight: 1.4,
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--bg-surface-hover)')}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                  >
+                    <X size={18} style={{ flexShrink: 0, color: 'var(--text-secondary)' }} />
+                    <span style={{ textAlign: 'left' }}>Close chat</span>
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Header Actions */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-        <button onClick={onOpenInfo} className="btn-icon" title="View Info">
-          <MoreVertical size={20} />
-        </button>
-      </div>
-    </div>
+      {/* Call Type Drawer (WhatsApp Style) */}
+      <BottomDrawer
+        isOpen={showCallDrawer}
+        onClose={() => setShowCallDrawer(false)}
+        title="Select call type"
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <button
+            onClick={() => handleCallOption('audio')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 16,
+              padding: '14px 16px',
+              backgroundColor: 'transparent',
+              border: 'none',
+              borderRadius: 'var(--radius-md)',
+              color: 'var(--text-primary)',
+              fontSize: 'var(--font-size-base)',
+              fontWeight: 500,
+              cursor: 'pointer',
+              textAlign: 'left',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--bg-surface-hover)')}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+          >
+            <Phone size={22} color="var(--primary-color)" />
+            <span>Voice call</span>
+          </button>
+
+          <button
+            onClick={() => handleCallOption('video')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 16,
+              padding: '14px 16px',
+              backgroundColor: 'transparent',
+              border: 'none',
+              borderRadius: 'var(--radius-md)',
+              color: 'var(--text-primary)',
+              fontSize: 'var(--font-size-base)',
+              fontWeight: 500,
+              cursor: 'pointer',
+              textAlign: 'left',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--bg-surface-hover)')}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+          >
+            <Video size={22} color="var(--primary-color)" />
+            <span>Video call</span>
+          </button>
+        </div>
+      </BottomDrawer>
+    </>
   )
 }

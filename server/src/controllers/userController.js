@@ -73,6 +73,17 @@ export const updateAvatar = async (req, res) => {
   }
 }
 
+// @desc    Delete / remove profile avatar
+// @route   DELETE /api/users/avatar
+export const deleteAvatar = async (req, res) => {
+  try {
+    const user = await User.findByIdAndUpdate(req.user._id, { avatar: '' }, { new: true }).select('-password')
+    res.status(200).json({ success: true, user })
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message })
+  }
+}
+
 // @desc    Heartbeat to keep user presence alive
 // @route   POST /api/users/heartbeat
 export const heartbeat = async (req, res) => {

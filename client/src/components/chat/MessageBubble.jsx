@@ -50,6 +50,69 @@ export const MessageBubble = ({
     return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i]
   }
 
+  // Detect 1-3 solo emojis sent without text
+  const getSoloEmojiInfo = (content, type) => {
+    if (type !== 'text' || !content) return null
+    const trimmed = content.trim()
+    const emojiOnlyRegex = /^(\p{Extended_Pictographic}|\p{Emoji_Presentation}|\uFE0F|\u200D|\u20E3)+$/u
+    if (!emojiOnlyRegex.test(trimmed)) return null
+
+    let count = 1
+    if (typeof Intl !== 'undefined' && Intl.Segmenter) {
+      const segmenter = new Intl.Segmenter('en', { granularity: 'grapheme' })
+      count = Array.from(segmenter.segment(trimmed)).length
+    } else {
+      count = Array.from(trimmed).length
+    }
+
+    if (count > 3) return null
+    const fontSize = count === 1 ? 52 : count === 2 ? 40 : 32
+    return { isSolo: true, count, fontSize }
+  }
+
+  const soloEmojiInfo = getSoloEmojiInfo(message.content, message.type)
+
+  // Swipe Right to Reply (Mobile touch gesture)
+  const [swipeOffset, setSwipeOffset] = useState(0)
+  const touchStartRef = React.useRef({ x: 0, y: 0 })
+  const hasVibratedRef = React.useRef(false)
+  const isSwipingRef = React.useRef(false)
+
+  const handleBubbleTouchStart = (e) => {
+    if (e.touches.length !== 1) return
+    touchStartRef.current = {
+      x: e.touches[0].clientX,
+      y: e.touches[0].clientY,
+    }
+    hasVibratedRef.current = false
+    isSwipingRef.current = false
+  }
+
+  const handleBubbleTouchMove = (e) => {
+    if (e.touches.length !== 1) return
+    const deltaX = e.touches[0].clientX - touchStartRef.current.x
+    const deltaY = e.touches[0].clientY - touchStartRef.current.y
+
+    if (deltaX > 10 && deltaX > Math.abs(deltaY) * 1.3) {
+      isSwipingRef.current = true
+      const capped = Math.min(Math.max(0, deltaX), 75)
+      setSwipeOffset(capped)
+
+      if (capped >= 50 && !hasVibratedRef.current) {
+        hasVibratedRef.current = true
+        if (navigator.vibrate) navigator.vibrate(25)
+      }
+    }
+  }
+
+  const handleBubbleTouchEnd = () => {
+    if (swipeOffset >= 50 && onReply && !isDeleted) {
+      onReply(message)
+    }
+    setSwipeOffset(0)
+    isSwipingRef.current = false
+  }
+
   const [showImageActions, setShowImageActions] = useState(false)
   const touchTimerRef = React.useRef(null)
 
@@ -132,23 +195,65 @@ export const MessageBubble = ({
           </button>
         )}
 
+        {/* Swipe-to-Reply Indicator (WhatsApp Style) */}
+        {swipeOffset > 0 && (
+          <div
+            style={{
+              position: 'absolute',
+              left: 12,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 32,
+              height: 32,
+              borderRadius: '50%',
+              backgroundColor: 'var(--bg-surface)',
+              border: '1px solid var(--border-color)',
+              color: 'var(--primary-color)',
+              opacity: Math.min(1, swipeOffset / 40),
+              transform: `scale(${Math.min(1, swipeOffset / 40)})`,
+              transition: isSwipingRef.current ? 'none' : 'all 0.2s ease',
+              boxShadow: 'var(--shadow-md)',
+              zIndex: 10,
+              pointerEvents: 'none',
+            }}
+          >
+            <Reply size={17} />
+          </div>
+        )}
+
         {/* Message Bubble Box */}
         <div
           className={isHighlighted ? 'highlight-flash' : ''}
+          onTouchStart={handleBubbleTouchStart}
+          onTouchMove={handleBubbleTouchMove}
+          onTouchEnd={handleBubbleTouchEnd}
+          onTouchCancel={handleBubbleTouchEnd}
           style={{
-            backgroundColor: isOutgoing ? 'var(--bubble-outgoing)' : 'var(--bubble-incoming)',
+            backgroundColor: soloEmojiInfo
+              ? 'transparent'
+              : isOutgoing
+                ? 'var(--bubble-outgoing)'
+                : 'var(--bubble-incoming)',
             color: isOutgoing ? 'var(--bubble-outgoing-text)' : 'var(--bubble-incoming-text)',
             borderRadius: 'var(--radius-md)',
             borderTopRightRadius: isOutgoing ? 0 : 'var(--radius-md)',
             borderTopLeftRadius: !isOutgoing ? 0 : 'var(--radius-md)',
-            padding: message.type === 'image' && !message.content ? '4px' : '8px 12px',
-            boxShadow: 'var(--shadow-sm)',
+            padding: soloEmojiInfo
+              ? '2px 6px'
+              : message.type === 'image' && !message.content
+                ? '4px'
+                : '8px 12px',
+            boxShadow: soloEmojiInfo ? 'none' : 'var(--shadow-sm)',
             position: 'relative',
-            minWidth: 90,
+            minWidth: soloEmojiInfo ? 'auto' : 90,
             maxWidth: '100%',
             wordBreak: 'break-word',
             border: isFailed ? '1px solid var(--accent-red)' : 'none',
-            transition: 'background-color 0.3s ease, box-shadow 0.3s ease',
+            transform: `translateX(${swipeOffset}px)`,
+            transition: isSwipingRef.current
+              ? 'none'
+              : 'transform 0.22s cubic-bezier(0.2, 0, 0, 1), background-color 0.3s ease, box-shadow 0.3s ease',
           }}
         >
           {/* Sender Name in Groups */}
@@ -219,10 +324,11 @@ export const MessageBubble = ({
                   style={{
                     position: 'relative',
                     marginBottom: message.content ? 6 : 0,
-                    borderRadius: 'var(--radius-sm)',
+                    borderRadius: 'var(--radius-md)',
                     overflow: 'hidden',
                     cursor: 'pointer',
-                    maxWidth: 360,
+                    maxWidth: isMobile ? 'min(330px, 80vw)' : 340,
+                    minWidth: isMobile ? 'min(240px, 65vw)' : 260,
                   }}
                   onMouseEnter={() => setImageHovered(true)}
                   onMouseLeave={() => {
@@ -243,12 +349,12 @@ export const MessageBubble = ({
                     src={message.attachmentUrl}
                     alt="attachment"
                     style={{
-                      maxHeight: isMobile ? 220 : 280,
-                      minHeight: 120,
+                      maxHeight: isMobile ? 360 : 420,
+                      minHeight: 180,
                       width: '100%',
                       objectFit: 'cover',
                       display: 'block',
-                      borderRadius: 'var(--radius-sm)',
+                      borderRadius: 'var(--radius-md)',
                       transition: 'opacity 0.2s ease',
                       opacity: (imageHovered || showImageActions) ? 0.88 : 1,
                     }}
@@ -431,10 +537,12 @@ export const MessageBubble = ({
               {message.content && (
                 <div
                   style={{
-                    fontSize: 'var(--font-size-base)',
-                    lineHeight: 1.4,
+                    fontSize: soloEmojiInfo ? `${soloEmojiInfo.fontSize}px` : 'var(--font-size-base)',
+                    lineHeight: soloEmojiInfo ? 1.15 : 1.4,
                     whiteSpace: 'pre-wrap',
-                    padding: message.type === 'image' ? '4px 6px' : 0,
+                    padding: message.type === 'image' ? '4px 6px' : soloEmojiInfo ? '0 2px' : 0,
+                    textAlign: soloEmojiInfo ? (isOutgoing ? 'right' : 'left') : 'left',
+                    filter: soloEmojiInfo ? 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' : 'none',
                   }}
                 >
                   {message.content}
@@ -450,14 +558,23 @@ export const MessageBubble = ({
               alignItems: 'center',
               justifyContent: 'flex-end',
               gap: 4,
-              marginTop: 2,
+              marginTop: soloEmojiInfo ? 4 : 2,
               fontSize: 'var(--font-size-xs)',
               color: isFailed
                 ? 'var(--accent-red)'
                 : isOutgoing
                   ? 'var(--bubble-outgoing-meta)'
                   : 'var(--bubble-incoming-meta)',
-              padding: message.type === 'image' && !message.content ? '0 6px 4px 0' : 0,
+              padding: soloEmojiInfo
+                ? '2px 8px'
+                : message.type === 'image' && !message.content
+                  ? '0 6px 4px 0'
+                  : 0,
+              backgroundColor: soloEmojiInfo ? 'rgba(0, 0, 0, 0.45)' : 'transparent',
+              borderRadius: soloEmojiInfo ? '999px' : '0',
+              backdropFilter: soloEmojiInfo ? 'blur(4px)' : 'none',
+              width: 'fit-content',
+              marginLeft: isOutgoing ? 'auto' : 0,
             }}
           >
             {isFailed ? (
