@@ -221,11 +221,11 @@ export const ForgotPasswordPage = () => {
             {step === 'reset' && <CheckCircle2 size={32} />}
           </div>
 
-          <h2 style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
+          <h1 style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
             {step === 'email' && 'Forgot Password'}
             {step === 'otp' && 'Enter Verification Code'}
             {step === 'reset' && 'Create New Password'}
-          </h2>
+          </h1>
 
           <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: '8px', marginBottom: 0 }}>
             {step === 'email' && 'Enter your email or username and we will send you a 6-digit OTP code to reset your password.'}
