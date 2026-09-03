@@ -8,42 +8,77 @@ import { getResetPasswordEmail } from '../templates/resetPasswordEmail.js'
 dotenv.config()
 
 /**
- * Logs EmailJS initialization status on server boot
+ * Returns the current configuration status of EmailJS credentials
  */
-export const verifyEmailConnection = async () => {
+export const getEmailConfigStatus = () => {
   const serviceId = process.env.EMAILJS_SERVICE_ID
   const templateId = process.env.EMAILJS_TEMPLATE_ID
   const publicKey = process.env.EMAILJS_PUBLIC_KEY
   const privateKey = process.env.EMAILJS_PRIVATE_KEY
 
-  if (!serviceId || !templateId || !publicKey || !privateKey) {
-    console.warn('[Email / EmailJS] Warning: EmailJS credentials not fully set in .env (email notifications disabled)')
+  const missing = []
+  if (!serviceId) missing.push('EMAILJS_SERVICE_ID')
+  if (!templateId) missing.push('EMAILJS_TEMPLATE_ID')
+  if (!publicKey) missing.push('EMAILJS_PUBLIC_KEY')
+  if (!privateKey) missing.push('EMAILJS_PRIVATE_KEY')
+
+  const isConfigured = missing.length === 0
+
+  return {
+    isConfigured,
+    missing,
+    details: {
+      serviceId: serviceId ? `${serviceId.substring(0, 5)}***` : 'NOT_SET',
+      templateId: templateId ? `${templateId.substring(0, 5)}***` : 'NOT_SET',
+      publicKeyConfigured: Boolean(publicKey),
+      privateKeyConfigured: Boolean(privateKey),
+    },
+  }
+}
+
+/**
+ * Logs EmailJS initialization status on server boot / cold start
+ */
+export const verifyEmailConnection = async () => {
+  const { isConfigured, missing, details } = getEmailConfigStatus()
+
+  if (!isConfigured) {
+    console.warn(
+      `[Email / EmailJS Config WARNING] Missing credentials in environment variables: ${missing.join(', ')}. Email delivery is DISABLED.`
+    )
     return false
   }
 
-  console.log('[Email / EmailJS] Ready — configured for transactional emails via EmailJS')
+  console.log(
+    `[Email / EmailJS Config OK] Ready for transactional emails. (Service: ${details.serviceId}, Template: ${details.templateId})`
+  )
   return true
 }
 
 /**
- * Unified email dispatcher via EmailJS REST API
+ * Unified email dispatcher via EmailJS REST API with comprehensive Vercel logging
  * @param {object} params
  * @param {string} params.toEmail - Recipient email
  * @param {string} params.toName - Recipient display name
  * @param {string} params.subject - Email subject
  * @param {string} params.otpCode - (Optional) 6-digit OTP code
  * @param {string} params.htmlContent - Full HTML email body
- * @returns {Promise<boolean>}
+ * @returns {Promise<{ success: boolean, status?: number, text?: string, error?: string }>}
  */
-const sendEmail = async ({ toEmail, toName, subject, otpCode, htmlContent }) => {
+export const sendEmail = async ({ toEmail, toName, subject, otpCode, htmlContent }) => {
   const serviceId = process.env.EMAILJS_SERVICE_ID
   const templateId = process.env.EMAILJS_TEMPLATE_ID
   const publicKey = process.env.EMAILJS_PUBLIC_KEY
   const privateKey = process.env.EMAILJS_PRIVATE_KEY
 
+  const startTime = Date.now()
+  console.log(`[EMAIL DISPATCH START] Target: ${toEmail} | Subject: "${subject}"`)
+
   if (!serviceId || !templateId || !publicKey || !privateKey) {
-    console.warn('[Email / EmailJS] Skipping email — EmailJS credentials not fully configured in .env')
-    return false
+    const { missing } = getEmailConfigStatus()
+    const errorMsg = `EmailJS credentials incomplete in environment: ${missing.join(', ')}`
+    console.error(`[EMAIL DISPATCH BLOCKED] ${errorMsg}`)
+    return { success: false, error: errorMsg }
   }
 
   try {
@@ -63,15 +98,34 @@ const sendEmail = async ({ toEmail, toName, subject, otpCode, htmlContent }) => 
       }
     )
 
+    const duration = Date.now() - startTime
+
     if (response.status === 200) {
-      return true
+      console.log(
+        `[EMAIL DISPATCH SUCCESS] Status: 200 (${response.text || 'OK'}) in ${duration}ms | Target: ${toEmail}`
+      )
+      return { success: true, status: response.status, text: response.text }
     } else {
-      console.error('[Email / EmailJS Error] Unexpected status:', response.status, response.text)
-      return false
+      console.error(
+        `[EMAIL DISPATCH UNEXPECTED STATUS] Status: ${response.status} (${response.text}) in ${duration}ms | Target: ${toEmail}`
+      )
+      return { success: false, status: response.status, text: response.text }
     }
   } catch (error) {
-    console.error('[Email / EmailJS Error] Send failed:', error?.message || error)
-    return false
+    const duration = Date.now() - startTime
+    const errorText = error?.text || error?.message || String(error)
+    const errorStatus = error?.status || 500
+
+    console.error(
+      `[EMAIL DISPATCH FAILED] Status: ${errorStatus} in ${duration}ms | Target: ${toEmail} | Error:`,
+      errorText
+    )
+
+    return {
+      success: false,
+      status: errorStatus,
+      error: errorText,
+    }
   }
 }
 
@@ -81,23 +135,22 @@ const sendEmail = async ({ toEmail, toName, subject, otpCode, htmlContent }) => 
  * @param {string} displayName - Recipient's display name
  * @param {string} otp - 6-digit OTP code
  * @param {string} subject - Email subject line
- * @returns {Promise<boolean>}
+ * @returns {Promise<{ success: boolean, status?: number, text?: string, error?: string }>}
  */
 export const sendVerificationOtp = async (toEmail, displayName, otp, subject = 'Verify your NexChat account') => {
   try {
     const htmlContent = getVerificationEmail({ displayName, otp })
-    const sent = await sendEmail({
+    const result = await sendEmail({
       toEmail,
       toName: displayName,
       subject,
       otpCode: otp,
       htmlContent,
     })
-    if (sent) console.log(`[Email Service] Verification OTP email sent to ${toEmail}`)
-    return sent
+    return result
   } catch (error) {
     console.error(`[Email Service Error] Failed to send Verification OTP:`, error.message)
-    return false
+    return { success: false, error: error.message }
   }
 }
 
@@ -106,23 +159,22 @@ export const sendVerificationOtp = async (toEmail, displayName, otp, subject = '
  * @param {string} toEmail - Recipient email
  * @param {string} displayName - Recipient's display name
  * @param {string} otp - 6-digit OTP code
- * @returns {Promise<boolean>}
+ * @returns {Promise<{ success: boolean, status?: number, text?: string, error?: string }>}
  */
 export const sendResetPasswordOtp = async (toEmail, displayName, otp) => {
   try {
     const htmlContent = getResetPasswordEmail({ displayName, otp })
-    const sent = await sendEmail({
+    const result = await sendEmail({
       toEmail,
       toName: displayName,
       subject: 'Reset your NexChat password',
       otpCode: otp,
       htmlContent,
     })
-    if (sent) console.log(`[Email Service] Password Reset OTP email sent to ${toEmail}`)
-    return sent
+    return result
   } catch (error) {
     console.error(`[Email Service Error] Failed to send Reset OTP:`, error.message)
-    return false
+    return { success: false, error: error.message }
   }
 }
 
@@ -165,14 +217,14 @@ export const sendOfflineNotification = async (recipient, sender, message, conver
       ? `💬 New message in ${chatName} from ${sender.displayName || sender.username}`
       : `💬 New message from ${sender.displayName || sender.username}`
 
-    const sent = await sendEmail({
+    const result = await sendEmail({
       toEmail: recipient.email,
       toName: recipient.displayName || recipient.username,
       subject,
       htmlContent,
     })
 
-    if (sent) {
+    if (result.success) {
       await User.findByIdAndUpdate(recipient._id, { lastNotifiedAt: new Date() })
       console.log(`[Email Service] Notification email sent to ${recipient.email}`)
     }

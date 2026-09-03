@@ -17,6 +17,10 @@ dotenv.config()
 
 const app = express()
 
+// Trust first proxy hop (Vercel Edge Proxy / reverse proxies)
+// Required for express-rate-limit and accurate client IP detection via X-Forwarded-For
+app.set('trust proxy', 1)
+
 // ─── CORS ──────────────────────────────────────────────────────────────────
 // Must be defined before all other middleware, especially before express.json()
 // Cannot use wildcard '*' with credentials: true — must whitelist exact origins.

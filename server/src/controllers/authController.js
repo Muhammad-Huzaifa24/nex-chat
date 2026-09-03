@@ -2,7 +2,7 @@ import bcrypt from 'bcryptjs'
 import User from '../models/User.js'
 import PendingUser from '../models/PendingUser.js'
 import { generateToken } from '../utils/jwt.js'
-import { sendVerificationOtp, sendResetPasswordOtp } from '../services/emailService.js'
+import { sendVerificationOtp, sendResetPasswordOtp, getEmailConfigStatus } from '../services/emailService.js'
 
 const cookieOptions = {
   httpOnly: true,
@@ -70,18 +70,19 @@ export const register = async (req, res) => {
       { upsert: true, new: true, setDefaultsOnInsert: true }
     )
 
-    // Send OTP email in background so user response is instant (<100ms)
-    sendVerificationOtp(normalizedEmail, displayName.trim(), otp).catch((err) =>
-      console.error('[Email Error]', err?.message)
-    )
+    // Await OTP email dispatch so serverless execution context does not freeze prematurely
+    console.log(`[VERCEL LOG / REGISTRATION OTP] Generated code for ${normalizedEmail}: ${otp}`)
+    const emailResult = await sendVerificationOtp(normalizedEmail, displayName.trim(), otp)
 
     res.status(200).json({
       success: true,
       message: 'Verification code sent to your email. Please check your inbox.',
       email: normalizedEmail,
       requiresVerification: true,
+      emailSent: emailResult?.success ?? false,
     })
   } catch (error) {
+    console.error('[REGISTRATION ERROR]', error)
     res.status(500).json({ success: false, message: error.message })
   }
 }
@@ -208,16 +209,17 @@ export const resendOtp = async (req, res) => {
     pending.otpAttempts = 0
     await pending.save()
 
-    // Send OTP email in background
-    sendVerificationOtp(pending.email, pending.displayName, otp).catch((err) =>
-      console.error('[Email Error]', err?.message)
-    )
+    // Await OTP email dispatch so serverless execution context does not freeze prematurely
+    console.log(`[VERCEL LOG / RESEND OTP] Generated code for ${pending.email}: ${otp}`)
+    const emailResult = await sendVerificationOtp(pending.email, pending.displayName, otp)
 
     res.status(200).json({
       success: true,
       message: 'New verification code sent to your email.',
+      emailSent: emailResult?.success ?? false,
     })
   } catch (error) {
+    console.error('[RESEND OTP ERROR]', error)
     res.status(500).json({ success: false, message: error.message })
   }
 }
@@ -363,15 +365,15 @@ export const forgotPassword = async (req, res) => {
     user.resetPasswordOtpAttempts = 0
     await user.save()
 
-    // Dispatch Reset OTP email in background for instant HTTP response (<100ms)
-    sendResetPasswordOtp(user.email, user.displayName, otp).catch((err) =>
-      console.error('[Email Error]', err?.message)
-    )
+    // Await Reset OTP email dispatch so serverless execution context does not freeze prematurely
+    console.log(`[VERCEL LOG / FORGOT PASSWORD OTP] Generated code for ${user.email}: ${otp}`)
+    const emailResult = await sendResetPasswordOtp(user.email, user.displayName, otp)
 
     res.status(200).json({
       success: true,
       message: 'If an account exists with that email or username, a verification code has been sent.',
       email: user.email,
+      emailSent: emailResult?.success ?? false,
     })
   } catch (error) {
     res.status(500).json({ success: false, message: error.message })
@@ -509,6 +511,111 @@ export const resetPassword = async (req, res) => {
       message: 'Password reset successfully! You can now log in with your new password.',
     })
   } catch (error) {
+    res.status(500).json({ success: false, message: error.message })
+  }
+}
+
+// @desc    Dedicated route to request/send email verification OTP
+// @route   POST /api/auth/send-verification-otp
+export const sendVerificationOtpRoute = async (req, res) => {
+  try {
+    const { email } = req.body
+
+    if (!email) {
+      return res.status(400).json({ success: false, message: 'Email is required' })
+    }
+
+    const normalizedEmail = email.toLowerCase().trim()
+    const pending = await PendingUser.findOne({ email: normalizedEmail })
+
+    if (!pending) {
+      return res.status(404).json({
+        success: false,
+        message: 'No pending registration found for this email. Please register again.',
+      })
+    }
+
+    // Cooldown check (60 seconds)
+    if (pending.otpExpires && new Date() < new Date(pending.otpExpires.getTime() - 14 * 60 * 1000)) {
+      return res.status(429).json({
+        success: false,
+        message: 'Please wait 60 seconds before requesting another code',
+      })
+    }
+
+    const otp = generateOtp()
+    pending.otp = otp
+    pending.otpExpires = new Date(Date.now() + 15 * 60 * 1000)
+    pending.otpAttempts = 0
+    await pending.save()
+
+    console.log(`[DEDICATED OTP ROUTE] Dispatching OTP for: ${normalizedEmail}`)
+    console.log(`[VERCEL LOG / OTP CODE] Code for ${normalizedEmail}: ${otp}`)
+
+    const emailResult = await sendVerificationOtp(pending.email, pending.displayName, otp)
+
+    return res.status(200).json({
+      success: true,
+      message: emailResult.success
+        ? 'Verification code sent to your email successfully.'
+        : 'Generated verification code, but email dispatch encountered an issue. Check server logs.',
+      email: normalizedEmail,
+      emailSent: emailResult.success,
+      emailDetails: {
+        status: emailResult.status,
+        text: emailResult.text || emailResult.error,
+      },
+    })
+  } catch (error) {
+    console.error('[DEDICATED OTP ROUTE ERROR]', error)
+    res.status(500).json({ success: false, message: error.message })
+  }
+}
+
+// @desc    Diagnostic test route to check EmailJS configuration and optionally test email sending
+// @route   GET/POST /api/auth/test-email
+export const testEmail = async (req, res) => {
+  try {
+    const toEmail = (req.method === 'POST' ? req.body.to : req.query.to)?.trim()
+    const configStatus = getEmailConfigStatus()
+
+    console.log('[TEST EMAIL DIAGNOSTIC REQUEST]', {
+      method: req.method,
+      targetEmail: toEmail || 'NONE (config-only)',
+      configStatus,
+    })
+
+    if (!toEmail) {
+      return res.status(200).json({
+        success: true,
+        message: 'Email configuration status retrieved. Provide ?to=your@email.com or POST { "to": "..." } to send a test email.',
+        config: configStatus,
+      })
+    }
+
+    const testOtp = generateOtp()
+    console.log(`[TEST EMAIL DISPATCH] Testing delivery to ${toEmail} with test OTP ${testOtp}`)
+
+    const emailResult = await sendVerificationOtp(
+      toEmail,
+      'NexChat Tester',
+      testOtp,
+      'NexChat Test Email Delivery'
+    )
+
+    console.log('[TEST EMAIL DISPATCH RESULT]', emailResult)
+
+    return res.status(emailResult.success ? 200 : 502).json({
+      success: emailResult.success,
+      message: emailResult.success
+        ? `Test email sent successfully to ${toEmail}`
+        : `Test email failed to send: ${emailResult.error || emailResult.text}`,
+      config: configStatus,
+      emailjsResponse: emailResult,
+      testOtpCode: testOtp,
+    })
+  } catch (error) {
+    console.error('[TEST EMAIL ERROR]', error)
     res.status(500).json({ success: false, message: error.message })
   }
 }
