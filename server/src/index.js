@@ -20,7 +20,7 @@ for (const envKey of REQUIRED_ENV) {
 
 const server = http.createServer(app)
 
-// Connect to MongoDB & Verify External Services (Cloudinary + Nodemailer)
+// Connect to MongoDB & Verify External Services (Cloudinary + EmailJS)
 connectDB().then(async () => {
   await verifyCloudinary()
   await verifyEmailConnection()

@@ -1,4 +1,6 @@
+import bcrypt from 'bcryptjs'
 import User from '../models/User.js'
+import PendingUser from '../models/PendingUser.js'
 import { generateToken } from '../utils/jwt.js'
 import { sendVerificationOtp, sendResetPasswordOtp } from '../services/emailService.js'
 
@@ -11,7 +13,7 @@ const cookieOptions = {
 
 const generateOtp = () => String(Math.floor(100000 + Math.random() * 900000))
 
-// @desc    Register a new user — sends OTP, does NOT log them in yet
+// @desc    Initiate registration — sends OTP, does NOT save to User collection yet
 // @route   POST /api/auth/register
 export const register = async (req, res) => {
   try {
@@ -31,57 +33,52 @@ export const register = async (req, res) => {
       })
     }
 
-    // Check if user or email already exists
+    const normalizedEmail = email.toLowerCase().trim()
+    const normalizedUsername = username.toLowerCase().trim()
+
+    // Check if email or username is already taken in the real User collection
     const existingUser = await User.findOne({
-      $or: [{ email: email.toLowerCase() }, { username: username.toLowerCase() }],
+      $or: [{ email: normalizedEmail }, { username: normalizedUsername }],
     })
 
     if (existingUser) {
-      // If previously registered but unverified — allow re-registration by updating OTP
-      if (!existingUser.isVerified) {
-        const otp = generateOtp()
-        existingUser.otp = otp
-        existingUser.otpExpires = new Date(Date.now() + 15 * 60 * 1000)
-        existingUser.otpAttempts = 0
-        await existingUser.save()
-        await sendVerificationOtp(existingUser.email, existingUser.displayName, otp)
-        return res.status(200).json({
-          success: true,
-          message: 'Verification code resent to your email. Please verify your account.',
-          email: existingUser.email,
-          requiresVerification: true,
-        })
-      }
-      const field = existingUser.email === email.toLowerCase() ? 'Email' : 'Username'
+      const field = existingUser.email === normalizedEmail ? 'Email' : 'Username'
       return res.status(409).json({
         success: false,
         message: `${field} is already taken`,
       })
     }
 
+    // Hash password before staging
+    const hashedPassword = await bcrypt.hash(password, 10)
     const otp = generateOtp()
     const otpExpires = new Date(Date.now() + 15 * 60 * 1000)
 
-    const user = await User.create({
-      username: username.toLowerCase().trim(),
-      email: email.toLowerCase().trim(),
-      password,
-      displayName: displayName.trim(),
-      isVerified: false,
-      otp,
-      otpExpires,
-      otpAttempts: 0,
-    })
+    // Upsert into PendingUser staging collection (safe if they re-submit registration)
+    await PendingUser.findOneAndUpdate(
+      { $or: [{ email: normalizedEmail }, { username: normalizedUsername }] },
+      {
+        username: normalizedUsername,
+        email: normalizedEmail,
+        password: hashedPassword,
+        displayName: displayName.trim(),
+        otp,
+        otpExpires,
+        otpAttempts: 0,
+        createdAt: new Date(), // Reset TTL timer on re-submit
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    )
 
     // Send OTP email in background so user response is instant (<100ms)
-    sendVerificationOtp(user.email, user.displayName, otp).catch((err) =>
+    sendVerificationOtp(normalizedEmail, displayName.trim(), otp).catch((err) =>
       console.error('[Email Error]', err?.message)
     )
 
-    res.status(201).json({
+    res.status(200).json({
       success: true,
-      message: 'Account created! Please check your email for the verification code.',
-      email: user.email,
+      message: 'Verification code sent to your email. Please check your inbox.',
+      email: normalizedEmail,
       requiresVerification: true,
     })
   } catch (error) {
@@ -89,7 +86,7 @@ export const register = async (req, res) => {
   }
 }
 
-// @desc    Verify email with OTP
+// @desc    Verify email OTP and create the real User account
 // @route   POST /api/auth/verify-email
 export const verifyEmail = async (req, res) => {
   try {
@@ -99,65 +96,79 @@ export const verifyEmail = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Email and OTP are required' })
     }
 
-    const user = await User.findOne({ email: email.toLowerCase().trim() })
+    const normalizedEmail = email.toLowerCase().trim()
 
-    if (!user) {
-      return res.status(404).json({ success: false, message: 'No account found with this email' })
+    const pending = await PendingUser.findOne({ email: normalizedEmail })
+
+    if (!pending) {
+      return res.status(404).json({
+        success: false,
+        message: 'Verification session not found or expired. Please register again.',
+      })
     }
 
-    if (user.isVerified) {
-      return res.status(400).json({ success: false, message: 'Email is already verified. Please log in.' })
-    }
-
-    if (!user.otp || !user.otpExpires) {
+    if (!pending.otp || !pending.otpExpires) {
       return res.status(400).json({ success: false, message: 'No verification code found. Please request a new one.' })
     }
 
-    if (new Date() > user.otpExpires) {
-      return res.status(400).json({ success: false, message: 'Verification code has expired. Please request a new one.' })
+    if (new Date() > pending.otpExpires) {
+      await PendingUser.deleteOne({ email: normalizedEmail })
+      return res.status(400).json({
+        success: false,
+        message: 'Verification code has expired. Please register again.',
+      })
     }
 
     // OTP Brute-force protection: Max 5 attempts
-    if (user.otp !== String(otp).trim()) {
-      user.otpAttempts = (user.otpAttempts || 0) + 1
+    if (pending.otp !== String(otp).trim()) {
+      pending.otpAttempts = (pending.otpAttempts || 0) + 1
 
-      if (user.otpAttempts >= 5) {
-        user.otp = null
-        user.otpExpires = null
-        user.otpAttempts = 0
-        await user.save()
+      if (pending.otpAttempts >= 5) {
+        await PendingUser.deleteOne({ email: normalizedEmail })
         return res.status(429).json({
           success: false,
-          message: 'Too many incorrect attempts. This code has been invalidated. Please request a new one.',
+          message: 'Too many incorrect attempts. Your session has been invalidated. Please register again.',
         })
       }
 
-      await user.save()
-      const remaining = 5 - user.otpAttempts
+      await pending.save()
+      const remaining = 5 - pending.otpAttempts
       return res.status(400).json({
         success: false,
         message: `Invalid verification code. ${remaining} attempt${remaining === 1 ? '' : 's'} remaining.`,
       })
     }
 
-    // Mark as verified and clear OTP & attempt counters
-    user.isVerified = true
-    user.otp = null
-    user.otpExpires = null
-    user.otpAttempts = 0
-    user.isOnline = true
-    await user.save()
+    // OTP is correct — create the real verified user account now
+    const user = await User.create({
+      username: pending.username,
+      email: pending.email,
+      password: pending.password,  // already bcrypt-hashed
+      displayName: pending.displayName,
+      isVerified: true,
+      isOnline: true,
+    })
+
+    // Clean up pending registration
+    await PendingUser.deleteOne({ email: normalizedEmail })
 
     const token = generateToken(user._id)
     res.cookie('token', token, cookieOptions)
 
-    res.status(200).json({
+    res.status(201).json({
       success: true,
       message: 'Email verified successfully! Welcome to NexChat.',
       user,
       token,
     })
   } catch (error) {
+    // Handle unique constraint race condition (very unlikely but safe)
+    if (error.code === 11000) {
+      return res.status(409).json({
+        success: false,
+        message: 'An account with this email or username was just created. Please try logging in.',
+      })
+    }
     res.status(500).json({ success: false, message: error.message })
   }
 }
@@ -172,18 +183,19 @@ export const resendOtp = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Email is required' })
     }
 
-    const user = await User.findOne({ email: email.toLowerCase().trim() })
+    const normalizedEmail = email.toLowerCase().trim()
 
-    if (!user) {
-      return res.status(404).json({ success: false, message: 'No account found with this email' })
-    }
+    const pending = await PendingUser.findOne({ email: normalizedEmail })
 
-    if (user.isVerified) {
-      return res.status(400).json({ success: false, message: 'This account is already verified' })
+    if (!pending) {
+      return res.status(404).json({
+        success: false,
+        message: 'No pending registration found for this email. Please register again.',
+      })
     }
 
     // 60-second rate limit — prevent spam resends
-    if (user.otpExpires && new Date() < new Date(user.otpExpires.getTime() - 14 * 60 * 1000)) {
+    if (pending.otpExpires && new Date() < new Date(pending.otpExpires.getTime() - 14 * 60 * 1000)) {
       return res.status(429).json({
         success: false,
         message: 'Please wait 60 seconds before requesting a new code',
@@ -191,13 +203,13 @@ export const resendOtp = async (req, res) => {
     }
 
     const otp = generateOtp()
-    user.otp = otp
-    user.otpExpires = new Date(Date.now() + 15 * 60 * 1000)
-    user.otpAttempts = 0
-    await user.save()
+    pending.otp = otp
+    pending.otpExpires = new Date(Date.now() + 15 * 60 * 1000)
+    pending.otpAttempts = 0
+    await pending.save()
 
     // Send OTP email in background
-    sendVerificationOtp(user.email, user.displayName, otp).catch((err) =>
+    sendVerificationOtp(pending.email, pending.displayName, otp).catch((err) =>
       console.error('[Email Error]', err?.message)
     )
 
@@ -237,7 +249,7 @@ export const login = async (req, res) => {
       return res.status(401).json({ success: false, message: 'Invalid credentials' })
     }
 
-    // Block login if email not yet verified
+    // All accounts in User collection are already verified, but guard just in case
     if (!user.isVerified) {
       return res.status(403).json({
         success: false,
@@ -489,7 +501,6 @@ export const resetPassword = async (req, res) => {
     user.resetPasswordOtp = null
     user.resetPasswordOtpExpires = null
     user.resetPasswordOtpAttempts = 0
-    // If user was not verified, resetting password via email confirms email ownership
     user.isVerified = true
     await user.save()
 

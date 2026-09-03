@@ -59,19 +59,7 @@ const userSchema = new mongoose.Schema(
     },
     isVerified: {
       type: Boolean,
-      default: false,
-    },
-    otp: {
-      type: String,
-      default: null,
-    },
-    otpExpires: {
-      type: Date,
-      default: null,
-    },
-    otpAttempts: {
-      type: Number,
-      default: 0,
+      default: true, // All accounts in User collection are always verified
     },
     resetPasswordOtp: {
       type: String,
@@ -112,9 +100,6 @@ userSchema.methods.comparePassword = async function (enteredPassword) {
 userSchema.methods.toJSON = function () {
   const obj = this.toObject()
   delete obj.password
-  delete obj.otp
-  delete obj.otpExpires
-  delete obj.otpAttempts
   delete obj.resetPasswordOtp
   delete obj.resetPasswordOtpExpires
   delete obj.resetPasswordOtpAttempts
