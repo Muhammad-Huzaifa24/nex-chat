@@ -10,7 +10,7 @@ const MAX_LIMITS_MB = {
   file: 30,
 }
 
-export const AttachmentMenu = ({ onSelectFile, onClose }) => {
+export const AttachmentMenu = ({ onSelectFile, onClose, onOpenCamera }) => {
   const menuRef = useRef(null)
   const addToast = useToastStore((state) => state.addToast)
 
@@ -76,6 +76,14 @@ export const AttachmentMenu = ({ onSelectFile, onClose }) => {
       accept: 'image/*',
       capture: 'environment',
       type: 'image',
+      onClick: () => {
+        if (onOpenCamera) {
+          onClose()
+          onOpenCamera()
+        } else {
+          cameraInputRef.current?.click()
+        }
+      },
     },
     {
       label: 'Photos',
@@ -85,6 +93,7 @@ export const AttachmentMenu = ({ onSelectFile, onClose }) => {
       ref: imageInputRef,
       accept: 'image/*',
       type: 'image',
+      onClick: () => imageInputRef.current?.click(),
     },
     {
       label: 'Videos',
@@ -94,6 +103,7 @@ export const AttachmentMenu = ({ onSelectFile, onClose }) => {
       ref: videoInputRef,
       accept: 'video/*',
       type: 'video',
+      onClick: () => videoInputRef.current?.click(),
     },
     {
       label: 'Audio',
@@ -103,6 +113,7 @@ export const AttachmentMenu = ({ onSelectFile, onClose }) => {
       ref: audioInputRef,
       accept: 'audio/*',
       type: 'audio',
+      onClick: () => audioInputRef.current?.click(),
     },
     {
       label: 'Document',
@@ -112,6 +123,7 @@ export const AttachmentMenu = ({ onSelectFile, onClose }) => {
       ref: fileInputRef,
       accept: '*/*',
       type: 'file',
+      onClick: () => fileInputRef.current?.click(),
     },
   ]
 
@@ -122,16 +134,16 @@ export const AttachmentMenu = ({ onSelectFile, onClose }) => {
       style={{
         position: 'absolute',
         bottom: 'calc(var(--input-area-height, 52px) + 8px)',
-        right: 56,
+        right: 50,
         backgroundColor: 'var(--bg-surface)',
-        borderRadius: 'var(--radius-lg)',
+        borderRadius: 'var(--radius-lg, 12px)',
         boxShadow: 'var(--shadow-popup)',
         border: '1px solid var(--border-color)',
-        padding: '10px',
+        padding: '6px',
         display: 'flex',
         flexDirection: 'column',
-        gap: '6px',
-        minWidth: 200,
+        gap: '2px',
+        minWidth: 175,
         zIndex: 50,
       }}
     >
@@ -148,17 +160,19 @@ export const AttachmentMenu = ({ onSelectFile, onClose }) => {
               onChange={(e) => handleFileChange(e, item.type)}
             />
             <button
-              onClick={() => item.ref.current?.click()}
+              onClick={item.onClick}
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: 12,
                 width: '100%',
-                padding: '8px 12px',
+                padding: '7px 8px',
                 borderRadius: 'var(--radius-md)',
                 color: 'var(--text-primary)',
                 cursor: 'pointer',
                 textAlign: 'left',
+                border: 'none',
+                backgroundColor: 'transparent',
               }}
               onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--bg-surface-hover)')}
               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}

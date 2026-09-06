@@ -3,6 +3,7 @@ import { Smile, Paperclip, SendHorizonal, Camera, X } from 'lucide-react'
 import { EmojiPicker } from './EmojiPicker'
 import { AttachmentMenu } from './AttachmentMenu'
 import { ReplyPreview } from './ReplyPreview'
+import { CameraModal } from './CameraModal'
 import { useDraftStore } from '../../store/draftStore'
 
 export const MessageInput = ({
@@ -16,6 +17,7 @@ export const MessageInput = ({
   const [text, setText] = useState('')
   const [showEmoji, setShowEmoji] = useState(false)
   const [showAttachment, setShowAttachment] = useState(false)
+  const [showCameraModal, setShowCameraModal] = useState(false)
   const [selectedFile, setSelectedFile] = useState(null)
   const [fileType, setFileType] = useState('text')
 
@@ -288,7 +290,7 @@ export const MessageInput = ({
           {/* Direct Camera Button */}
           <button
             type="button"
-            onClick={() => cameraInputRef.current?.click()}
+            onClick={() => setShowCameraModal(true)}
             className="btn-icon"
             title="Camera"
             style={{
@@ -355,8 +357,23 @@ export const MessageInput = ({
         <AttachmentMenu
           onSelectFile={handleFileSelect}
           onClose={() => setShowAttachment(false)}
+          onOpenCamera={() => setShowCameraModal(true)}
         />
       )}
+
+      {/* Live Webcam / Desktop Camera Viewfinder Modal */}
+      <CameraModal
+        isOpen={showCameraModal}
+        onClose={() => setShowCameraModal(false)}
+        onCapture={(file) => {
+          setShowCameraModal(false)
+          handleFileSelect(file, 'image')
+        }}
+        onFallbackToFile={() => {
+          setShowCameraModal(false)
+          cameraInputRef.current?.click()
+        }}
+      />
     </div>
   )
 }

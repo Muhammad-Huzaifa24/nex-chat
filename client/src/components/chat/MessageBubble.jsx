@@ -242,7 +242,7 @@ export const MessageBubble = ({
             padding: soloEmojiInfo
               ? '2px 6px'
               : message.type === 'image' && !message.content
-                ? '4px'
+                ? '3px'
                 : '8px 12px',
             boxShadow: soloEmojiInfo ? 'none' : 'var(--shadow-sm)',
             position: 'relative',
@@ -457,9 +457,8 @@ export const MessageBubble = ({
                           height: 34,
                           borderRadius: 'var(--radius-full)',
                           backgroundColor: 'rgba(239, 68, 68, 0.65)',
-                          backdropFilter: 'blur(6px)',
-                          border: '1px solid rgba(255, 255, 255, 0.4)',
-                          color: '#ffffff',
+                          color: 'white',
+                          border: 'none',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -472,6 +471,45 @@ export const MessageBubble = ({
                       >
                         <Trash2 size={16} />
                       </button>
+                    </div>
+                  )}
+
+                  {/* WhatsApp-Style Photo Overlay Timestamp (when no description/caption) */}
+                  {!message.content && !isDeleted && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        bottom: 6,
+                        right: 8,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        padding: '2px 7px',
+                        borderRadius: '10px',
+                        backgroundColor: 'rgba(0, 0, 0, 0.45)',
+                        backdropFilter: 'blur(3px)',
+                        color: '#ffffff',
+                        fontSize: '11px',
+                        fontWeight: 500,
+                        lineHeight: 1.2,
+                        pointerEvents: 'none',
+                        zIndex: 2,
+                      }}
+                    >
+                      <span>{formatTime(message.createdAt)}</span>
+                      {isOutgoing && (
+                        <span style={{ display: 'inline-flex', alignItems: 'center' }}>
+                          {isPending ? (
+                            <Clock size={12} color="#ffffff" style={{ opacity: 0.8 }} />
+                          ) : message.status === 'read' ? (
+                            <CheckCheck size={13} color="#53bdeb" />
+                          ) : message.status === 'delivered' ? (
+                            <CheckCheck size={13} color="#ffffff" />
+                          ) : (
+                            <Check size={13} color="#ffffff" />
+                          )}
+                        </span>
+                      )}
                     </div>
                   )}
                 </div>
@@ -552,57 +590,55 @@ export const MessageBubble = ({
           )}
 
           {/* Timestamp & Status ticks / Pending clock / Failed indicator */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'flex-end',
-              gap: 4,
-              marginTop: soloEmojiInfo ? 4 : 2,
-              fontSize: 'var(--font-size-xs)',
-              color: isFailed
-                ? 'var(--accent-red)'
-                : isOutgoing
-                  ? 'var(--bubble-outgoing-meta)'
-                  : 'var(--bubble-incoming-meta)',
-              padding: soloEmojiInfo
-                ? '2px 8px'
-                : message.type === 'image' && !message.content
-                  ? '0 6px 4px 0'
-                  : 0,
-              backgroundColor: soloEmojiInfo ? 'rgba(0, 0, 0, 0.45)' : 'transparent',
-              borderRadius: soloEmojiInfo ? '999px' : '0',
-              backdropFilter: soloEmojiInfo ? 'blur(4px)' : 'none',
-              width: 'fit-content',
-              marginLeft: isOutgoing ? 'auto' : 0,
-            }}
-          >
-            {isFailed ? (
-              <span
-                onClick={() => onRetry && onRetry(message)}
-                style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4, fontWeight: 500 }}
-              >
-                <AlertCircle size={12} /> Not sent · Tap to retry
-              </span>
-            ) : (
-              <>
-                <span>{formatTime(message.createdAt)}</span>
-                {isOutgoing && !isDeleted && (
-                  <span>
-                    {isPending ? (
-                      <Clock size={13} style={{ opacity: 0.75 }} />
-                    ) : message.status === 'read' ? (
-                      <CheckCheck size={14} color="var(--tick-read)" />
-                    ) : message.status === 'delivered' ? (
-                      <CheckCheck size={14} color="var(--tick-delivered)" />
-                    ) : (
-                      <Check size={14} color="var(--tick-sent)" />
-                    )}
-                  </span>
-                )}
-              </>
-            )}
-          </div>
+          {!(message.type === 'image' && !message.content) && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'flex-end',
+                gap: 4,
+                marginTop: soloEmojiInfo ? 4 : 2,
+                fontSize: 'var(--font-size-xs)',
+                color: isFailed
+                  ? 'var(--accent-red)'
+                  : isOutgoing
+                    ? 'var(--bubble-outgoing-meta)'
+                    : 'var(--bubble-incoming-meta)',
+                padding: soloEmojiInfo ? '2px 8px' : 0,
+                backgroundColor: soloEmojiInfo ? 'rgba(0, 0, 0, 0.45)' : 'transparent',
+                borderRadius: soloEmojiInfo ? '999px' : '0',
+                backdropFilter: soloEmojiInfo ? 'blur(4px)' : 'none',
+                width: 'fit-content',
+                marginLeft: isOutgoing ? 'auto' : 0,
+              }}
+            >
+              {isFailed ? (
+                <span
+                  onClick={() => onRetry && onRetry(message)}
+                  style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4, fontWeight: 500 }}
+                >
+                  <AlertCircle size={12} /> Not sent · Tap to retry
+                </span>
+              ) : (
+                <>
+                  <span>{formatTime(message.createdAt)}</span>
+                  {isOutgoing && !isDeleted && (
+                    <span>
+                      {isPending ? (
+                        <Clock size={13} style={{ opacity: 0.75 }} />
+                      ) : message.status === 'read' ? (
+                        <CheckCheck size={14} color="var(--tick-read)" />
+                      ) : message.status === 'delivered' ? (
+                        <CheckCheck size={14} color="var(--tick-delivered)" />
+                      ) : (
+                        <Check size={14} color="var(--tick-sent)" />
+                      )}
+                    </span>
+                  )}
+                </>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Action Controls for Non-Image messages (Reply, React, Delete) */}
