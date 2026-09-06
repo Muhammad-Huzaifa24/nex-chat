@@ -28,3 +28,38 @@ self.addEventListener('notificationclick', (event) => {
     })
   )
 })
+
+// Background Push Event Handler (W3C Web Push wakes up Service Worker when tab is frozen/closed)
+self.addEventListener('push', (event) => {
+  let payload = {
+    title: 'NexChat',
+    body: 'You have a new message',
+    icon: '/icon-192.png',
+    badge: '/icon-192.png',
+    url: '/',
+  }
+
+  if (event.data) {
+    try {
+      const json = event.data.json()
+      payload = { ...payload, ...json }
+    } catch {
+      payload.body = event.data.text()
+    }
+  }
+
+  const options = {
+    body: payload.body,
+    icon: payload.icon || '/icon-192.png',
+    badge: payload.badge || '/icon-192.png',
+    vibrate: [100, 50, 100],
+    data: {
+      url: payload.url || '/',
+      conversationId: payload.conversationId,
+    },
+    tag: payload.tag || `nexchat-${payload.conversationId || 'msg'}`,
+    renotify: true,
+  }
+
+  event.waitUntil(self.registration.showNotification(payload.title, options))
+})

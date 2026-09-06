@@ -1,10 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { Smile, Paperclip, SendHorizonal, Camera, X } from 'lucide-react'
+import { Smile, Paperclip, SendHorizonal, Camera, X, Mic, Globe } from 'lucide-react'
 import { EmojiPicker } from './EmojiPicker'
 import { AttachmentMenu } from './AttachmentMenu'
 import { ReplyPreview } from './ReplyPreview'
 import { CameraModal } from './CameraModal'
 import { useDraftStore } from '../../store/draftStore'
+import { useToastStore } from '../../store/toastStore'
+import { fetchLinkPreview, previewCache } from '../../services/linkPreviewService'
 
 export const MessageInput = ({
   activeConversationId,
@@ -20,11 +22,16 @@ export const MessageInput = ({
   const [showCameraModal, setShowCameraModal] = useState(false)
   const [selectedFile, setSelectedFile] = useState(null)
   const [fileType, setFileType] = useState('text')
+  const [inputLinkPreview, setInputLinkPreview] = useState(null)
+  const [isLoadingLinkPreview, setIsLoadingLinkPreview] = useState(false)
+  const [dismissedUrl, setDismissedUrl] = useState(null)
 
   const textareaRef = useRef(null)
   const cameraInputRef = useRef(null)
   const typingTimerRef = useRef(null)
   const isTypingRef = useRef(false)
+  const lastTypingEmitRef = useRef(0)
+  const addToast = useToastStore((state) => state.addToast)
 
   // Load persistent draft when switching conversation
   useEffect(() => {
@@ -69,6 +76,58 @@ export const MessageInput = ({
     }
   }, [text])
 
+  // Extract URL helper
+  const extractUrl = (str) => {
+    if (!str || typeof str !== 'string') return null
+    const match = str.match(/(https?:\/\/[^\s]+|www\.[^\s]+)/i)
+    if (!match) return null
+    return match[0].startsWith('http') ? match[0] : `https://${match[0]}`
+  }
+
+  // Load link preview
+  const loadInputPreview = async (url) => {
+    if (!url) return
+    if (previewCache.has(url)) {
+      setInputLinkPreview(previewCache.get(url))
+      setIsLoadingLinkPreview(false)
+      return
+    }
+
+    setIsLoadingLinkPreview(true)
+    const data = await fetchLinkPreview(url)
+    setIsLoadingLinkPreview(false)
+    if (data && (data.title || data.image)) {
+      setInputLinkPreview(data)
+    }
+  }
+
+  // Instant trigger as soon as user pastes a link
+  const handlePaste = (e) => {
+    const pastedText = e.clipboardData?.getData('text')
+    if (pastedText) {
+      const url = extractUrl(pastedText)
+      if (url && url !== dismissedUrl) {
+        loadInputPreview(url)
+      }
+    }
+  }
+
+  // Auto-detect link as text is typed or pasted
+  useEffect(() => {
+    const url = extractUrl(text)
+    if (!url) {
+      setInputLinkPreview(null)
+      setIsLoadingLinkPreview(false)
+      return
+    }
+
+    if (url === dismissedUrl) return
+
+    if (!inputLinkPreview || inputLinkPreview.url !== url) {
+      loadInputPreview(url)
+    }
+  }, [text, dismissedUrl])
+
   const handleTextChange = (e) => {
     const val = e.target.value
     setText(val)
@@ -76,22 +135,26 @@ export const MessageInput = ({
       useDraftStore.getState().setDraft(activeConversationId, val)
     }
 
-    // Trigger typing:start only ONCE when typing begins
-    if (!isTypingRef.current) {
+    // Throttled typing heartbeat: emit typing:start every 2 seconds while typing continues
+    const now = Date.now()
+    if (!isTypingRef.current || now - lastTypingEmitRef.current > 2000) {
       isTypingRef.current = true
+      lastTypingEmitRef.current = now
       if (onTypingStart) onTypingStart()
     }
 
-    // Debounce typing:stop after 1.5 seconds of inactivity
+    // Debounce typing:stop after 2.5 seconds of inactivity
     if (typingTimerRef.current) clearTimeout(typingTimerRef.current)
     typingTimerRef.current = setTimeout(() => {
       isTypingRef.current = false
+      lastTypingEmitRef.current = 0
       if (onTypingStop) onTypingStop()
-    }, 1500)
+    }, 2500)
   }
 
   const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    // Enter key creates a new line (default behavior). Ctrl+Enter or Cmd+Enter sends message.
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
       e.preventDefault()
       handleSend()
     }
@@ -125,6 +188,9 @@ export const MessageInput = ({
     setText('')
     setSelectedFile(null)
     setFileType('text')
+    setInputLinkPreview(null)
+    setIsLoadingLinkPreview(false)
+    setDismissedUrl(null)
     if (onCancelReply) onCancelReply()
 
     if (textareaRef.current) {
@@ -134,10 +200,9 @@ export const MessageInput = ({
 
     // Immediately stop typing indicator
     if (typingTimerRef.current) clearTimeout(typingTimerRef.current)
-    if (isTypingRef.current) {
-      isTypingRef.current = false
-      if (onTypingStop) onTypingStop()
-    }
+    isTypingRef.current = false
+    lastTypingEmitRef.current = 0
+    if (onTypingStop) onTypingStop()
 
     // Fire non-blocking asynchronous send
     onSendMessage(payload)
@@ -201,6 +266,113 @@ export const MessageInput = ({
         </div>
       )}
 
+      {/* Instant Paste / Typing Link Preview Card */}
+      {(inputLinkPreview || isLoadingLinkPreview) && dismissedUrl !== (inputLinkPreview?.url || extractUrl(text)) && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '8px 12px',
+            backgroundColor: 'var(--bg-header, #202c33)',
+            borderBottom: '1px solid var(--border-subtle, rgba(255,255,255,0.08))',
+            gap: 12,
+            position: 'relative',
+          }}
+        >
+          {/* Thumbnail image if available */}
+          {inputLinkPreview?.image && (
+            <img
+              src={inputLinkPreview.image}
+              alt={inputLinkPreview.title || 'Link preview'}
+              style={{
+                width: 52,
+                height: 52,
+                borderRadius: '6px',
+                objectFit: 'cover',
+                flexShrink: 0,
+                backgroundColor: 'rgba(0,0,0,0.2)',
+              }}
+              onError={(e) => (e.currentTarget.style.display = 'none')}
+            />
+          )}
+
+          {/* Middle Text Info */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {isLoadingLinkPreview ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '13px', color: 'var(--text-muted)' }}>
+                <Globe size={14} className="animate-spin" />
+                <span>Fetching link preview...</span>
+              </div>
+            ) : (
+              <>
+                <div
+                  style={{
+                    fontSize: '11px',
+                    color: '#53bdeb',
+                    fontWeight: 600,
+                    textTransform: 'lowercase',
+                    marginBottom: 2,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4,
+                  }}
+                >
+                  <Globe size={11} />
+                  <span>{inputLinkPreview?.siteName || extractUrl(text)}</span>
+                </div>
+                <a
+                  href={inputLinkPreview?.url || extractUrl(text)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    color: 'var(--text-primary, #e9edef)',
+                    textDecoration: 'none',
+                    display: 'block',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {inputLinkPreview?.title || extractUrl(text)}
+                </a>
+                {inputLinkPreview?.description && (
+                  <div
+                    style={{
+                      fontSize: '11.5px',
+                      color: 'var(--text-secondary, #8696a0)',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      marginTop: 1,
+                    }}
+                  >
+                    {inputLinkPreview.description}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Close Button to dismiss preview */}
+          <button
+            type="button"
+            onClick={() => {
+              setDismissedUrl(inputLinkPreview?.url || extractUrl(text))
+              setInputLinkPreview(null)
+              setIsLoadingLinkPreview(false)
+            }}
+            className="btn-icon"
+            title="Dismiss link preview"
+            style={{ width: 28, height: 28, color: 'var(--text-muted)', flexShrink: 0 }}
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
       {/* Input row — WhatsApp style */}
       <div
         style={{
@@ -250,6 +422,7 @@ export const MessageInput = ({
             value={text}
             onChange={handleTextChange}
             onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
             placeholder="Type a message..."
             style={{
               flex: 1,
@@ -304,37 +477,68 @@ export const MessageInput = ({
           </button>
         </div>
 
-        {/* Send Button (WhatsApp circular teal — outside the input field) */}
-        <button
-          type="button"
-          onClick={handleSend}
-          disabled={!text.trim() && !selectedFile}
-          style={{
-            width: 44,
-            height: 44,
-            borderRadius: '50%',
-            backgroundColor: 'var(--primary-color)',
-            color: '#ffffff',
-            border: 'none',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: (!text.trim() && !selectedFile) ? 'default' : 'pointer',
-            opacity: (!text.trim() && !selectedFile) ? 0.45 : 1,
-            boxShadow: (!text.trim() && !selectedFile) ? 'none' : '0 3px 10px rgba(0, 168, 132, 0.4)',
-            transition: 'transform 0.15s ease, opacity 0.15s ease',
-            flexShrink: 0,
-          }}
-          onMouseEnter={(e) => {
-            if (text.trim() || selectedFile) e.currentTarget.style.transform = 'scale(1.06)'
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'scale(1)'
-          }}
-          title="Send message"
-        >
-          <SendHorizonal size={20} />
-        </button>
+        {/* Action Button: Voice Notes Mic when empty, Send Arrow when text/file present (WhatsApp Style) */}
+        {text.trim() || selectedFile ? (
+          <button
+            type="button"
+            onClick={handleSend}
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: '50%',
+              backgroundColor: 'var(--primary-color)',
+              color: '#ffffff',
+              border: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              opacity: 1,
+              boxShadow: '0 3px 10px rgba(0, 168, 132, 0.4)',
+              transition: 'transform 0.15s ease, opacity 0.15s ease',
+              flexShrink: 0,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'scale(1.06)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'scale(1)'
+            }}
+            title="Send message"
+          >
+            <SendHorizonal size={20} />
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => addToast('Voice notes are coming soon in feature branch 4!', 'info', 3000)}
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: '50%',
+              backgroundColor: 'var(--primary-color)',
+              color: '#ffffff',
+              border: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              opacity: 1,
+              boxShadow: '0 3px 10px rgba(0, 168, 132, 0.4)',
+              transition: 'transform 0.15s ease',
+              flexShrink: 0,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'scale(1.06)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'scale(1)'
+            }}
+            title="Voice note"
+          >
+            <Mic size={20} />
+          </button>
+        )}
       </div>
 
       {/* Emoji Picker Popup */}

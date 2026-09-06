@@ -204,15 +204,31 @@ export const MessageList = ({
           </div>
         )}
 
-        {messages.map((msg) => {
+        {messages.map((msg, idx) => {
           const msgDate = new Date(msg.createdAt).toDateString()
           const showDate = msgDate !== lastDate
           lastDate = msgDate
 
+          const prevMsg = idx > 0 ? messages[idx - 1] : null
+          const nextMsg = idx < messages.length - 1 ? messages[idx + 1] : null
+
+          const currentSenderId = (msg.senderId?._id || msg.senderId)?.toString()
+          const prevSenderId = prevMsg ? (prevMsg.senderId?._id || prevMsg.senderId)?.toString() : null
+          const nextSenderId = nextMsg ? (nextMsg.senderId?._id || nextMsg.senderId)?.toString() : null
+
+          const prevTimeDiff = prevMsg ? Math.abs(new Date(msg.createdAt) - new Date(prevMsg.createdAt)) : Infinity
+          const nextTimeDiff = nextMsg ? Math.abs(new Date(nextMsg.createdAt) - new Date(msg.createdAt)) : Infinity
+
+          const isSameSenderAsPrev = !showDate && prevSenderId === currentSenderId && prevTimeDiff < 60000
+          const isSameSenderAsNext = nextSenderId === currentSenderId && nextTimeDiff < 60000
+
+          const isFirstInGroup = !isSameSenderAsPrev
+          const isLastInGroup = !isSameSenderAsNext
+
           return (
-            <React.Fragment key={msg._id}>
+            <React.Fragment key={msg._id || msg.tempId}>
               {showDate && renderDateSeparator(msg.createdAt)}
-              <div id={`msg-${msg._id}`}>
+              <div id={`msg-${msg._id || msg.tempId}`}>
                 <MessageBubble
                   message={msg}
                   currentUserId={currentUserId}
@@ -224,6 +240,8 @@ export const MessageList = ({
                   onImageClick={onImageClick}
                   onScrollToMessage={scrollToMessage}
                   isHighlighted={highlightedMessageId === msg._id}
+                  isFirstInGroup={isFirstInGroup}
+                  isLastInGroup={isLastInGroup}
                 />
               </div>
             </React.Fragment>

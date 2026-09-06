@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useAuthStore } from './store/authStore'
 import { useThemeStore } from './store/themeStore'
@@ -10,22 +10,7 @@ import { DirectChatRedirect } from './pages/DirectChatRedirect'
 import { SettingsPage } from './pages/SettingsPage'
 import { MainLayout } from './components/layout/MainLayout'
 import { ToastContainer } from './components/ui/Toast'
-import { Loader2 } from 'lucide-react'
-
-const AppLoader = () => (
-  <div
-    style={{
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      height: '100vh',
-      width: '100vw',
-      backgroundColor: 'var(--bg-app)',
-    }}
-  >
-    <Loader2 size={36} className="animate-spin" color="var(--primary-color)" />
-  </div>
-)
+import { AppLoader } from './components/ui/AppLoader'
 
 // Protected route — requires authentication AND email verification
 const ProtectedRoute = ({ children }) => {
@@ -62,13 +47,23 @@ const VerifyRoute = ({ children }) => {
 }
 
 export default function App() {
-  const { fetchMe } = useAuthStore()
+  const { fetchMe, isLoading } = useAuthStore()
   const { theme } = useThemeStore()
+  const [splashFinished, setSplashFinished] = useState(false)
+
+  const handleSplashComplete = React.useCallback(() => {
+    setSplashFinished(true)
+  }, [])
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
     fetchMe()
   }, [])
+
+  // Show splash loader screen for 3s or until bar animation completes
+  if (!splashFinished || isLoading) {
+    return <AppLoader onComplete={handleSplashComplete} />
+  }
 
   return (
     <BrowserRouter>

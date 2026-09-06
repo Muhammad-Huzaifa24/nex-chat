@@ -19,7 +19,7 @@ export const getMessages = async (req, res) => {
     const conversation = await Conversation.findOne({
       _id: conversationId,
       participants: userId,
-    })
+    }).select('_id').lean()
 
     if (!conversation) {
       return res.status(403).json({ success: false, message: 'Not authorized to view messages in this conversation' })
@@ -37,6 +37,7 @@ export const getMessages = async (req, res) => {
         path: 'replyTo',
         populate: { path: 'senderId', select: 'displayName username' },
       })
+      .lean()
 
     const total = await Message.countDocuments({
       conversationId,
@@ -131,14 +132,31 @@ export const sendMessage = async (req, res) => {
     conversation.hiddenFor = []
     await conversation.save()
 
-    const populated = await Message.findById(newMessage._id)
-      .populate('senderId', 'username displayName avatar isOnline')
-      .populate({
-        path: 'replyTo',
-        populate: { path: 'senderId', select: 'displayName username' },
-      })
+    // Build populated message in memory without a redundant second DB query
+    let replyToData = null
+    if (replyTo) {
+      replyToData = await Message.findById(replyTo)
+        .select('senderId content type')
+        .populate('senderId', 'displayName username')
+        .lean()
+    }
 
-    // Trigger Realtime Pusher events
+    const populated = {
+      ...newMessage.toObject(),
+      senderId: {
+        _id: req.user._id,
+        username: req.user.username,
+        displayName: req.user.displayName,
+        avatar: req.user.avatar,
+        isOnline: true,
+      },
+      replyTo: replyToData || null,
+    }
+
+    // Respond immediately to client (sub-30ms WhatsApp speed)
+    res.status(201).json({ success: true, message: populated })
+
+    // Background asynchronous Realtime Pusher & Socket.IO dispatch
     const channels = [`conversation-${conversationId}`]
     if (conversation.participants && Array.isArray(conversation.participants)) {
       conversation.participants.forEach((p) => {
@@ -149,9 +167,8 @@ export const sendMessage = async (req, res) => {
     triggerPusherEvent(channels, 'message:new', {
       message: populated,
       conversationId,
-    })
+    }).catch((err) => console.error('[Pusher Async Error]', err))
 
-    // Bridge to Socket.IO if instance exists
     const io = req.app?.get('io')
     if (io) {
       io.to(conversationId).emit('message:new', {
@@ -173,8 +190,6 @@ export const sendMessage = async (req, res) => {
         })
       })
       .catch((err) => console.error('[Offline Email Error]', err))
-
-    res.status(201).json({ success: true, message: populated })
   } catch (error) {
     console.error('[Send Message Error]', error)
     res.status(500).json({ success: false, message: error.message || 'Failed to send message' })
@@ -417,6 +432,53 @@ export const markMessageAsDelivered = async (req, res) => {
     }
 
     res.status(200).json({ success: true, message: 'Message marked as delivered' })
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message })
+  }
+}
+
+// @desc    Mark all sent messages in a conversation as delivered for recipient
+// @route   PUT /api/messages/deliver-all/:conversationId
+export const markConversationMessagesAsDelivered = async (req, res) => {
+  try {
+    const { conversationId } = req.params
+    const userId = req.user._id
+
+    const result = await Message.updateMany(
+      {
+        conversationId,
+        senderId: { $ne: userId },
+        status: 'sent',
+      },
+      { status: 'delivered' }
+    )
+
+    if (result.modifiedCount > 0) {
+      const channels = [`conversation-${conversationId}`]
+      const conversation = await Conversation.findById(conversationId)
+      if (conversation?.participants && Array.isArray(conversation.participants)) {
+        conversation.participants.forEach((p) => {
+          channels.push(`user-${p.toString()}`)
+        })
+      }
+
+      triggerPusherEvent(channels, 'message:status_update', {
+        conversationId,
+        status: 'delivered',
+        readBy: userId,
+      })
+
+      const io = req.app?.get('io')
+      if (io) {
+        io.to(conversationId).emit('message:status_update', {
+          conversationId,
+          status: 'delivered',
+          readBy: userId,
+        })
+      }
+    }
+
+    res.status(200).json({ success: true, count: result.modifiedCount })
   } catch (error) {
     res.status(500).json({ success: false, message: error.message })
   }

@@ -124,6 +124,7 @@ export const getUserConversations = async (req, res) => {
         populate: { path: 'senderId', select: 'username displayName' },
       })
       .populate('groupAdmins', 'username displayName')
+      .lean()
 
     res.status(200).json({ success: true, conversations })
   } catch (error) {

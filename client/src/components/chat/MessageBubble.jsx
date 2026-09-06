@@ -12,6 +12,7 @@ import {
   RotateCcw,
 } from 'lucide-react'
 import { ReactionPicker } from './ReactionPicker'
+import { LinkPreviewCard } from './LinkPreviewCard'
 
 export const MessageBubble = ({
   message,
@@ -24,6 +25,8 @@ export const MessageBubble = ({
   onImageClick,
   onScrollToMessage,
   isHighlighted = false,
+  isFirstInGroup = true,
+  isLastInGroup = true,
 }) => {
   const [showOptions, setShowOptions] = useState(false)
   const [showReactionPicker, setShowReactionPicker] = useState(false)
@@ -71,6 +74,58 @@ export const MessageBubble = ({
   }
 
   const soloEmojiInfo = getSoloEmojiInfo(message.content, message.type)
+
+  // Extract URL for OpenGraph rich link previews
+  const extractFirstUrl = (text) => {
+    if (!text || typeof text !== 'string') return null
+    const match = text.match(/(https?:\/\/[^\s]+|www\.[^\s]+)/i)
+    if (!match) return null
+    return match[0].startsWith('http') ? match[0] : `https://${match[0]}`
+  }
+  const detectedUrl = message.type === 'text' && !isDeleted ? extractFirstUrl(message.content) : null
+
+  // Render message text with clickable WhatsApp-blue links
+  const renderFormattedContent = (text) => {
+    if (!text || typeof text !== 'string') return null
+
+    const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/gi
+    const parts = text.split(urlRegex)
+
+    if (parts.length === 1) {
+      return text
+    }
+
+    return parts.map((part, index) => {
+      if (part.match(urlRegex)) {
+        const href = part.startsWith('http') ? part : `https://${part}`
+        return (
+          <a
+            key={index}
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              color: '#53bdeb',
+              textDecoration: 'underline',
+              wordBreak: 'break-all',
+              cursor: 'pointer',
+              transition: 'color 0.15s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = '#79d2f6'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = '#53bdeb'
+            }}
+          >
+            {part}
+          </a>
+        )
+      }
+      return part
+    })
+  }
 
   // Swipe Right to Reply (Mobile touch gesture)
   const [swipeOffset, setSwipeOffset] = useState(0)
@@ -149,7 +204,7 @@ export const MessageBubble = ({
         display: 'flex',
         flexDirection: 'column',
         alignItems: isOutgoing ? 'flex-end' : 'flex-start',
-        marginBottom: '8px',
+        marginBottom: isLastInGroup ? '8px' : '2px',
         padding: '0 16px',
         position: 'relative',
       }}
@@ -165,8 +220,9 @@ export const MessageBubble = ({
           alignItems: 'center',
           flexDirection: isOutgoing ? 'row-reverse' : 'row',
           gap: 8,
-          maxWidth: isMobile ? '85%' : '75%',
+          maxWidth: isMobile ? '88%' : '70%',
           width: 'fit-content',
+          position: 'relative',
         }}
       >
         {/* Failed Retry Icon on side of bubble */}
@@ -224,7 +280,11 @@ export const MessageBubble = ({
 
         {/* Message Bubble Box */}
         <div
-          className={isHighlighted ? 'highlight-flash' : ''}
+          className={`${isHighlighted ? 'highlight-flash' : ''} ${
+            message.status === 'pending' || (Date.now() - new Date(message.createdAt).getTime() < 8000)
+              ? 'animate-message-in'
+              : ''
+          }`}
           onTouchStart={handleBubbleTouchStart}
           onTouchMove={handleBubbleTouchMove}
           onTouchEnd={handleBubbleTouchEnd}
@@ -237,18 +297,23 @@ export const MessageBubble = ({
                 : 'var(--bubble-incoming)',
             color: isOutgoing ? 'var(--bubble-outgoing-text)' : 'var(--bubble-incoming-text)',
             borderRadius: 'var(--radius-md)',
-            borderTopRightRadius: isOutgoing ? 0 : 'var(--radius-md)',
-            borderTopLeftRadius: !isOutgoing ? 0 : 'var(--radius-md)',
+            borderTopRightRadius: isFirstInGroup && isOutgoing && !soloEmojiInfo ? 0 : 'var(--radius-md)',
+            borderTopLeftRadius: isFirstInGroup && !isOutgoing && !soloEmojiInfo ? 0 : 'var(--radius-md)',
+            marginRight: isFirstInGroup && isOutgoing && !soloEmojiInfo ? 6 : 0,
+            marginLeft: isFirstInGroup && !isOutgoing && !soloEmojiInfo ? 6 : 0,
             padding: soloEmojiInfo
               ? '2px 6px'
               : message.type === 'image' && !message.content
                 ? '3px'
-                : '8px 12px',
-            boxShadow: soloEmojiInfo ? 'none' : 'var(--shadow-sm)',
+                : '6px 9px',
+            boxShadow: soloEmojiInfo ? 'none' : '0 1px 0.5px rgba(11,20,26,0.13)',
             position: 'relative',
-            minWidth: soloEmojiInfo ? 'auto' : 90,
+            minWidth: soloEmojiInfo ? 'auto' : 70,
+            width: detectedUrl ? (isMobile ? 'min(380px, 85vw)' : '420px') : 'fit-content',
             maxWidth: '100%',
+            boxSizing: 'border-box',
             wordBreak: 'break-word',
+            flexShrink: 0,
             border: isFailed ? '1px solid var(--accent-red)' : 'none',
             transform: `translateX(${swipeOffset}px)`,
             transition: isSwipingRef.current
@@ -256,6 +321,49 @@ export const MessageBubble = ({
               : 'transform 0.22s cubic-bezier(0.2, 0, 0, 1), background-color 0.3s ease, box-shadow 0.3s ease',
           }}
         >
+          {/* Outgoing Speech Bubble Tail (WhatsApp Web SVG) */}
+          {isFirstInGroup && isOutgoing && !soloEmojiInfo && (
+            <span
+              style={{
+                position: 'absolute',
+                top: 0,
+                right: -8,
+                width: 8,
+                height: 13,
+                overflow: 'hidden',
+                pointerEvents: 'none',
+              }}
+            >
+              <svg viewBox="0 0 8 13" width="8" height="13" style={{ display: 'block' }}>
+                <path
+                  fill="var(--bubble-outgoing)"
+                  d="M5.188,1H0v11.193l6.467-8.625 C7.526,2.156,6.958,1,5.188,1z"
+                />
+              </svg>
+            </span>
+          )}
+
+          {/* Incoming Speech Bubble Tail (WhatsApp Web SVG) */}
+          {isFirstInGroup && !isOutgoing && !soloEmojiInfo && (
+            <span
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: -8,
+                width: 8,
+                height: 13,
+                overflow: 'hidden',
+                pointerEvents: 'none',
+              }}
+            >
+              <svg viewBox="0 0 8 13" width="8" height="13" style={{ display: 'block' }}>
+                <path
+                  fill="var(--bubble-incoming)"
+                  d="M2.812,1h5.188v11.193l-6.467-8.625C0.474,2.156,1.042,1,2.812,1z"
+                />
+              </svg>
+            </span>
+          )}
           {/* Sender Name in Groups */}
           {isGroup && !isOutgoing && (
             <div
@@ -571,6 +679,13 @@ export const MessageBubble = ({
                 </div>
               )}
 
+              {/* Rich OpenGraph Link Preview Card */}
+              {detectedUrl && (
+                <div style={{ width: '100%', minWidth: isMobile ? 'min(240px, 75vw)' : 260, boxSizing: 'border-box' }}>
+                  <LinkPreviewCard url={detectedUrl} />
+                </div>
+              )}
+
               {/* Text Content */}
               {message.content && (
                 <div
@@ -578,19 +693,67 @@ export const MessageBubble = ({
                     fontSize: soloEmojiInfo ? `${soloEmojiInfo.fontSize}px` : 'var(--font-size-base)',
                     lineHeight: soloEmojiInfo ? 1.15 : 1.4,
                     whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-word',
                     padding: message.type === 'image' ? '4px 6px' : soloEmojiInfo ? '0 2px' : 0,
                     textAlign: soloEmojiInfo ? (isOutgoing ? 'right' : 'left') : 'left',
                     filter: soloEmojiInfo ? 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' : 'none',
                   }}
                 >
-                  {message.content}
+                  <span>{renderFormattedContent(message.content)}</span>
+                  {!soloEmojiInfo && (
+                    <span
+                      style={{
+                        float: 'right',
+                        marginLeft: 10,
+                        marginTop: 4,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 3,
+                        fontSize: '11px',
+                        color: isFailed
+                          ? 'var(--accent-red)'
+                          : isOutgoing
+                            ? 'var(--bubble-outgoing-meta)'
+                            : 'var(--bubble-incoming-meta)',
+                        userSelect: 'none',
+                        whiteSpace: 'nowrap',
+                        verticalAlign: 'bottom',
+                      }}
+                    >
+                      {isFailed ? (
+                        <span
+                          onClick={() => onRetry && onRetry(message)}
+                          style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 3, fontWeight: 500 }}
+                        >
+                          <AlertCircle size={12} /> Not sent · Tap to retry
+                        </span>
+                      ) : (
+                        <>
+                          <span>{formatTime(message.createdAt)}</span>
+                          {isOutgoing && !isDeleted && (
+                            <span>
+                              {isPending ? (
+                                <Clock size={12} style={{ opacity: 0.75 }} />
+                              ) : message.status === 'read' ? (
+                                <CheckCheck size={14} color="var(--tick-read)" />
+                              ) : message.status === 'delivered' ? (
+                                <CheckCheck size={14} color="var(--tick-delivered)" />
+                              ) : (
+                                <Check size={14} color="var(--tick-sent)" />
+                              )}
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </span>
+                  )}
                 </div>
               )}
             </>
           )}
 
-          {/* Timestamp & Status ticks / Pending clock / Failed indicator */}
-          {!(message.type === 'image' && !message.content) && (
+          {/* Fallback Bottom Timestamp for non-text attachments (audio, video, file) or solo emojis */}
+          {!(message.type === 'image' && !message.content) && (!message.content || soloEmojiInfo) && (
             <div
               style={{
                 display: 'flex',
@@ -643,7 +806,25 @@ export const MessageBubble = ({
 
         {/* Action Controls for Non-Image messages (Reply, React, Delete) */}
         {showOptions && !isDeleted && message.type !== 'image' && !isFailed && !isPending && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <div
+            style={{
+              position: 'absolute',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              [isOutgoing ? 'right' : 'left']: 'calc(100% + 6px)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 2,
+              backgroundColor: 'var(--bg-surface)',
+              borderRadius: '20px',
+              padding: '2px 4px',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+              border: '1px solid var(--border-color)',
+              zIndex: 10,
+              whiteSpace: 'nowrap',
+              animation: 'fadeIn 0.15s ease',
+            }}
+          >
             <button
               onClick={() => setShowReactionPicker(!showReactionPicker)}
               className="btn-icon"
@@ -662,7 +843,7 @@ export const MessageBubble = ({
             </button>
             <button
               onClick={() => onDelete(message)}
-              className="btn-icon"
+              className="btn-icon hover-danger"
               style={{ width: 28, height: 28 }}
               title="Delete"
             >

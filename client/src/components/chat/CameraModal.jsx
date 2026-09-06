@@ -76,14 +76,14 @@ export const CameraModal = ({ isOpen, onClose, onCapture, onFallbackToFile }) =>
   return (
     <div
       style={{
-        position: 'fixed',
+        position: 'absolute',
         inset: 0,
-        zIndex: 99999,
+        zIndex: 50,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: 'rgba(0, 0, 0, 0.85)',
-        backdropFilter: 'blur(6px)',
+        backgroundColor: 'rgba(0, 0, 0, 0.75)',
+        backdropFilter: 'blur(4px)',
         padding: 16,
       }}
     >

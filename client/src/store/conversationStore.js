@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import api from '../services/api'
+import { useAuthStore } from './authStore'
 
 export const useConversationStore = create((set, get) => ({
   conversations: [],
@@ -21,7 +22,19 @@ export const useConversationStore = create((set, get) => ({
     set({ isLoading: true })
     try {
       const res = await api.get('/conversations')
-      set({ conversations: res.data.conversations, isLoading: false })
+      const convs = res.data.conversations || []
+      set({ conversations: convs, isLoading: false })
+
+      // Auto-deliver all undelivered messages from other participants on app open
+      const currentUserId = useAuthStore.getState().user?._id?.toString()
+      if (currentUserId) {
+        convs.forEach((c) => {
+          const lastSenderId = (c.lastMessage?.senderId?._id || c.lastMessage?.senderId)?.toString()
+          if (lastSenderId && lastSenderId !== currentUserId && c.lastMessage?.status === 'sent') {
+            api.put(`/messages/deliver-all/${c._id}`).catch(() => {})
+          }
+        })
+      }
     } catch (err) {
       console.error('Failed to fetch conversations', err)
       set({ isLoading: false })
@@ -64,6 +77,9 @@ export const useConversationStore = create((set, get) => ({
     set((state) => {
       const updated = state.conversations.map((c) => {
         if (c._id === conversationId && c.lastMessage) {
+          if (c.lastMessage.status === 'read' && status !== 'read') {
+            return c
+          }
           if (readBy) {
             const senderId = (c.lastMessage.senderId?._id || c.lastMessage.senderId)?.toString()
             if (senderId && senderId !== readBy.toString()) {

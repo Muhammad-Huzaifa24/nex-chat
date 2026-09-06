@@ -136,6 +136,24 @@ export const MainLayout = () => {
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
+  // Handle mobile hardware and gesture back button navigation
+  useEffect(() => {
+    if (!isMobile) return
+
+    if (activeConversation) {
+      window.history.pushState({ view: 'chat', id: activeConversation._id }, '')
+
+      const handlePopState = () => {
+        setActiveConversation(null)
+      }
+
+      window.addEventListener('popstate', handlePopState)
+      return () => {
+        window.removeEventListener('popstate', handlePopState)
+      }
+    }
+  }, [isMobile, activeConversation?._id])
+
   // Initialize data, Socket.IO & Pusher channels
   useEffect(() => {
     if (!token) return
@@ -195,8 +213,8 @@ export const MainLayout = () => {
         }
       })
 
-      socket.on('message:status_update', ({ conversationId, status, readBy }) => {
-        updateMessageStatus(conversationId, status, readBy)
+      socket.on('message:status_update', ({ conversationId, status, readBy, messageId }) => {
+        updateMessageStatus(conversationId, status, readBy, messageId)
         updateLastMessageStatus(conversationId, status, readBy)
       })
 
@@ -243,9 +261,9 @@ export const MainLayout = () => {
           }
         })
 
-        userChannel.bind('message:status_update', ({ conversationId, status, readBy }) => {
-          console.log('[Pusher Debug] userChannel message:status_update received:', { conversationId, status, readBy })
-          updateMessageStatus(conversationId, status, readBy)
+        userChannel.bind('message:status_update', ({ conversationId, status, readBy, messageId }) => {
+          console.log('[Pusher Debug] userChannel message:status_update received:', { conversationId, status, readBy, messageId })
+          updateMessageStatus(conversationId, status, readBy, messageId)
           updateLastMessageStatus(conversationId, status, readBy)
         })
 
@@ -352,8 +370,8 @@ export const MainLayout = () => {
         }
       })
 
-      channel.bind('message:status_update', ({ conversationId, status, readBy }) => {
-        updateMessageStatus(conversationId, status, readBy)
+      channel.bind('message:status_update', ({ conversationId, status, readBy, messageId }) => {
+        updateMessageStatus(conversationId, status, readBy, messageId)
         updateLastMessageStatus(conversationId, status, readBy)
       })
 
@@ -421,7 +439,17 @@ export const MainLayout = () => {
       {(!isMobile || activeConversation) && (
         <div style={{ flex: 1, height: '100%', display: 'flex', overflow: 'hidden', minWidth: 0, position: 'relative' }}>
           <ChatArea
-            onBack={isMobile ? () => setActiveConversation(null) : null}
+            onBack={
+              isMobile
+                ? () => {
+                    if (window.history.state?.view === 'chat') {
+                      window.history.back()
+                    } else {
+                      setActiveConversation(null)
+                    }
+                  }
+                : null
+            }
             onImageClick={(src) => setLightboxSrc(src)}
           />
 

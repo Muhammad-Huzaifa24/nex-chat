@@ -75,5 +75,8 @@ const messageSchema = new mongoose.Schema(
   }
 )
 
+messageSchema.index({ conversationId: 1, createdAt: 1 })
+messageSchema.index({ conversationId: 1, status: 1, senderId: 1 })
+
 const Message = mongoose.model('Message', messageSchema)
 export default Message

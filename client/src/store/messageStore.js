@@ -126,16 +126,24 @@ export const useMessageStore = create((set, get) => ({
     })
   },
 
-  updateMessageStatus: (conversationId, status, readBy = null) => {
+  updateMessageStatus: (conversationId, status, readBy = null, messageId = null) => {
     set((state) => {
       const current = state.messages[conversationId] || []
       return {
         messages: {
           ...state.messages,
           [conversationId]: current.map((m) => {
+            // If messageId is specifically targeted, only update that message
+            if (messageId && m._id !== messageId && m.tempId !== messageId) {
+              return m
+            }
+            // NEVER downgrade already read messages back to delivered or sent
+            if (m.status === 'read' && status !== 'read') {
+              return m
+            }
             if (readBy) {
               const senderId = (m.senderId?._id || m.senderId)?.toString()
-              // Messages sent by anyone other than reader (i.e. the sender) are marked as read
+              // Messages sent by anyone other than reader (i.e. the sender) are marked with new status
               if (senderId && senderId !== readBy.toString()) {
                 return { ...m, status }
               }
